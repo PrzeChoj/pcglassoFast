@@ -66,7 +66,7 @@ pcglassoFast <- function(
   while (!stop_loop & i < max.iter) {
     resD <- DOptim(
       A = R * S,
-      starting_point = D,
+      D0 = D,
       tol = D.tol,
       max.starting.iter = D.max.starting.iter,
       max.outer.iter = D.max.outer.iter,
@@ -126,4 +126,10 @@ function_to_optimize <- function(R, d, S, lambda, alpha) {
   }
 
   2 * sum(log(diag(chol(R)))) + (1 - alpha) * 2 * sum(log(d)) - trace_DSDR(d, S, R) - lambda * my_norm_1(R)
+}
+
+#' compute tr(DSDR) where D are diagonal matrices
+trace_DSDR <- function(d, S, R) {
+  # return(sum(c(S)*rep(d,times=length(d))*rep(d,each=length(d))*c(R)))
+  return(sum(d * (S * R) %*% d))
 }

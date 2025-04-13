@@ -7,22 +7,22 @@ ROptim <- function(
     tol.outer = 1e-4,
     max.inner.iter = 10,
     max.outer.iter = 100) {
-  if (is.null(Qinv)) {
-    Qinv <- solve(Q)
+  if (is.null(Rinv)) {
+    Rinv <- solve(R)
   }
 
   # TODO: tol.inner, max.inner.iter
 
-  p <- dim(Q)[1]
+  p <- dim(R)[1]
   lambda_matrix <- (matrix(rep(1, p * p), ncol = p) - diag(p)) * lambda
   ans <- ROptim_to_fortran(S, rho = lambda_matrix, thr = tol.outer, maxIt = max.outer.iter) # start = "warm"
 
-  Q <- ans$wi
-  Qinv <- ans$w
+  R <- ans$wi
+  Rinv <- ans$w
   outer.count <- ans$niter
   loglik <- NA
 
-  return(list(Q = Q, Qinv = Qinv, outer.count = outer.count, loglik = loglik))
+  return(list(R = R, Rinv = Rinv, outer.count = outer.count, loglik = loglik))
 }
 
 
