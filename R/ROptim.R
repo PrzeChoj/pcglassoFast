@@ -1,3 +1,31 @@
+ROptim <- function(
+    S,
+    R,
+    lambda,
+    Rinv = NULL,
+    tol.inner = 1e-4,
+    tol.outer = 1e-4,
+    max.inner.iter = 10,
+    max.outer.iter = 100) {
+  if (is.null(Qinv)) {
+    Qinv <- solve(Q)
+  }
+
+  # TODO: tol.inner, max.inner.iter
+
+  p <- dim(Q)[1]
+  lambda_matrix <- (matrix(rep(1, p * p), ncol = p) - diag(p)) * lambda
+  ans <- ROptim_to_fortran(S, rho = lambda_matrix, thr = tol.outer, maxIt = max.outer.iter) # start = "warm"
+
+  Q <- ans$wi
+  Qinv <- ans$w
+  outer.count <- ans$niter
+  loglik <- NA
+
+  return(list(Q = Q, Qinv = Qinv, outer.count = outer.count, loglik = loglik))
+}
+
+
 # GLASSO algorithm of Friedman et al. 2008 with FORTRAN implementation of Sustik and Calderhead 2012.
 # Ported to R by J. Clavel <julien.clavel@hotmail.fr> / <clavel@biologie.ens.fr> - 2017.
 
@@ -24,7 +52,7 @@
 #' }
 #'
 #' @keywords glasso covariance matrix regularization penalized likelihood
-ROptim <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, start = c("cold", "warm"), w.init = NULL, wi.init = NULL, trace = FALSE) {
+ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, start = c("cold", "warm"), w.init = NULL, wi.init = NULL, trace = FALSE) {
   n <- nrow(S) # dimension of S
   if (is.matrix(rho)) {
     if (length(rho) != n * n) stop("The input matrix for \"rho\" must be of size ", n, " by ", n)

@@ -2,7 +2,6 @@
 % Please edit documentation in R/pcglassoFast-package.R
 \docType{package}
 \name{pcglassoFast-package}
-\alias{pcglassoFast}
 \alias{pcglassoFast-package}
 \title{glassoFast: a Fast Graphical LASSO}
 \description{
