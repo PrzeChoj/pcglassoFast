@@ -1,4 +1,4 @@
-      subroutine glassofast(n,S,L,thr,maxIt,msg,warm,X,W,Wd,WXj,info)
+      subroutine roptim(n,S,L,thr,maxIt,msg,warm,X,W,Wd,WXj,info)
 !
 !     .. Scalar Arguments ..
       implicit double precision(a-h, o-z)
@@ -163,4 +163,4 @@ do i = 1,n-1
 enddo
 maxIt = iter
 return
-end subroutine glassofast
+end subroutine roptim
