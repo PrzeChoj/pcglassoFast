@@ -1,2 +1,2 @@
-export(pcglassoFast)
-useDynLib(pcglassoFast, .registration = TRUE)
+export(glassoFast)
+useDynLib(glassoFast, .registration = TRUE)
