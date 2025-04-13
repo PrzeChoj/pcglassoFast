@@ -42,7 +42,7 @@ A list with the following components:
 }
 }
 \description{
-Part of the PCGLASSO function.
+Part of the [pcglassoFast()] function.
 This implementation is a small modification of the `glassoFast` function from `glassoFast` package.
 }
 \keyword{covariance}
