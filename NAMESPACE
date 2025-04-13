@@ -1,0 +1,2 @@
+export(pcglassoFast)
+useDynLib(pcglassoFast, .registration = TRUE)

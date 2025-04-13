@@ -1,0 +1,2 @@
+GITHUB_PAT=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
+FLIBS=-L/usr/local/lib/gcc/14 -lgfortran -lquadmath
