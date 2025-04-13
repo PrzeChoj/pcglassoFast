@@ -77,7 +77,9 @@ gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, 
     inner.iter <- 0
     grad <- gradient.d(d, A, alpha)
     H <- hessian.diag.d(d, diag.A, alpha)
-    H.inv.g <- -grad / H
+    eps <- 1e-8
+    H.safe <- pmax(H, eps)
+    H.inv.g <- -grad / H.safe
     stepsize <- 1
     while (val.star < val.old && inner.iter < max_inner) {
       d.star <- d + stepsize * H.inv.g
@@ -87,10 +89,14 @@ gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, 
     }
     if (val.star > val.old) {
       d <- d.star
-      grad <- gradient.d(d, A, alpha)
+      grad <- gradient.d(d, A, alpha) # TODO: Do we have to calculate this here?
       H <- hessian.diag.d(d, diag.A, alpha)
-      H.inv.g <- -grad / H
+      eps <- 1e-8
+      H.safe <- pmax(H, eps)
+      H.inv.g <- -grad / H.safe
       val <- val.star
+    } else {
+      2 + 2 # TODO: End the loop?
     }
 
     iter <- iter + 1
