@@ -58,11 +58,11 @@ pcglassoFast <- function(
   D <- rep(1, dim(S)[1])
   stop_loop <- FALSE
   i <- 1
-  loss_vec <- rep(0, max.iter)
+  loss_R <- rep(0, max.iter)
   loss_D <- rep(0, max.iter)
   loss_old <- function_to_optimize(R, D, S, lambda, alpha)
-  loss_vec[i] <- loss_old
-  loss_D[i] <- loss_old
+  loss_R[1] <- loss_old
+  loss_D[1] <- loss_old
   while (!stop_loop & i < max.iter) {
     resD <- DOptim(
       A = R * S,
@@ -74,6 +74,7 @@ pcglassoFast <- function(
     )
     D <- resD$D
     loss_D[i + 1] <- function_to_optimize(R, D, S, lambda, alpha)
+    stopifnot(loss_D[i + 1] > loss_R[i])
 
     resR <- ROptim(
       S = sweep(sweep(S, 1, D, "*"), 2, D, "*"),
@@ -85,7 +86,6 @@ pcglassoFast <- function(
       max.inner.iter = R.max.inner.iter,
       max.outer.iter = R.max.outer.iter
     )
-
     R <- resR$R
     R_inv <- resR$Qinv
 
@@ -93,11 +93,13 @@ pcglassoFast <- function(
     stop_loop <- (loss_new - loss_old < tolerance)
     loss_old <- loss_new
 
+    loss_R[i + 1] <- loss_old
+    stopifnot(loss_R[i + 1] > loss_D[i + 1])
+
     i <- i + 1
-    loss_vec[i] <- loss_old
   }
 
-  loss_vec <- loss_vec[1:i]
+  loss_R <- loss_R[1:i]
   loss_D <- loss_D[1:i]
   D <- as.vector(D)
   return(list(
@@ -106,7 +108,7 @@ pcglassoFast <- function(
     "D" = D,
     "R_inv" = R_inv,
     "n_iters" = i,
-    "loss" = loss_vec,
+    "loss" = loss_R,
     "loss_D" = loss_D
   ))
 }
