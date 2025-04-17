@@ -9,7 +9,7 @@ DOptim <- function(
   if (is.null(D0)) {
     D0 <- get_good_starting_point(A, max.starting.iter)
   }
-  Res <- gradient.line.diagH.search(D0, A, alpha, tol = tol, max_iter = max.outer.iter, max_inner = 10)
+  Res <- gradient.line.diagH.search(D0, A, alpha, tol = tol, max_iter = max.outer.iter, max_inner = 15)
   return(Res)
 }
 
@@ -65,22 +65,22 @@ newton <- function(A, x0, b = 0, t0 = 1) {
 }
 
 #' @importFrom Matrix diag
-gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, max_inner = 5) {
+gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, max_inner = 15) {
   iter <- 0
   val.old <- -Inf
   val <- f.d(d, A, alpha)
   diag.A <- Matrix::diag(A)
-  inner.iter <- 0
-  while (val - val.old > tol && iter < max_iter && inner.iter < max_inner) {
+  inner_fail <- FALSE
+  while (val - val.old > tol && iter < max_iter && !inner_fail) {
     val.old <- val
     val.star <- -Inf
-    inner.iter <- 0
     grad <- gradient.d(d, A, alpha)
     H <- hessian.diag.d(d, diag.A, alpha)
     eps <- 1e-8
-    H.safe <- pmax(H, eps)
+    H.safe <- H - eps
     H.inv.g <- -grad / H.safe
     stepsize <- 1
+    inner.iter <- 0
     while (val.star < val.old && inner.iter < max_inner) {
       d.star <- d + stepsize * H.inv.g
       val.star <- f.d(d.star, A, alpha)
@@ -89,14 +89,11 @@ gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, 
     }
     if (val.star > val.old) {
       d <- d.star
-      grad <- gradient.d(d, A, alpha) # TODO: Do we have to calculate this here?
-      H <- hessian.diag.d(d, diag.A, alpha)
-      eps <- 1e-8
-      H.safe <- pmax(H, eps)
-      H.inv.g <- -grad / H.safe
       val <- val.star
     } else {
-      2 + 2 # TODO: End the loop?
+      inner_fail <- TRUE
+      # Should not happen.
+      warning("Fail of the inner iteration of optimization process for diagonal. This should not occur. Please open issue to let us know.")
     }
 
     iter <- iter + 1
