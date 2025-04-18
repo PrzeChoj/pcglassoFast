@@ -11,11 +11,11 @@ ROptim <- function(
     Rinv <- solve(R)
   }
 
-  # TODO: tol.inner, max.inner.iter
+  # TODO: tol.inner, max.inner.iter, start = "warm"
 
   p <- dim(R)[1]
   lambda_matrix <- (matrix(rep(1, p * p), ncol = p) - diag(p)) * lambda
-  ans <- ROptim_to_fortran(S, rho = lambda_matrix, thr = tol.outer, maxIt = max.outer.iter) # start = "warm"
+  ans <- ROptim_to_fortran(S, rho = lambda_matrix, thr = tol.outer, maxIt = max.outer.iter)
 
   R <- ans$wi
   Rinv <- ans$w

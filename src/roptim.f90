@@ -11,6 +11,8 @@
 !  Purpose
 !  =======
 !
+!  TODO(Our comment)
+!
 !  This subroutine computes the L1 regularized covariance matrix estimate
 !  using the algorithm described in the paper:
 !    J. Friedman, T. Hastie, R. Tibshirani:
@@ -31,7 +33,9 @@
 !         The empirical covariance matrix
 !
 !  L      (input) double precision array, dimension n x n
-!         Regularization matrix (symmetric); U NAS off-diagonal ze stala wartoscia
+!         Regularization matrix (symmetric);
+!         We only tested this with the constand off-diagonal
+!         and 0 diagonal
 !
 !  thr    (input) double precision
 !         Convergence threshold
@@ -90,24 +94,18 @@ if (thrLasso .lt. 2*EPS) then
    thrLasso = 2*EPS
 end if
 if (warm .eq. 0) then
-   X = 0.0 ! X to kwadracik
-   W = 0.0 ! TODO(Sprawdzic, czy nie lepiej z innego)
+   X = 0.0
+   W = 0.0 ! TODO(Mayby different W would be better?)
    do i = 1,n
       W(i,i) = 1.0
    enddo
 else
    do i = 1,n
-     X(1:n,i) = -X(1:n,i)/X(i,i) ! To wazne -- X zmienia interpretacje; teraz to bedzie kwadracik
+     X(1:n,i) = -X(1:n,i)/X(i,i)
      X(i,i) = 0
   end do
 end if
-!do i = 1,n ! My tego nie mamy
-!   Wd(i) = S(i,i) + L(i,i)
-!   W(i,i) = Wd(i)
-!end do
 do iter = 1,maxIt
-! if (msg .ne. 0) write(6,*) "iteration =", iter
-!   print iterations to the console (ok with CRAN)
 if (msg .ne. 0)  call intpr('iter:',-1,iter,1)
    dw = 0.0
    do j = 1,n
@@ -121,7 +119,7 @@ if (msg .ne. 0)  call intpr('iter:',-1,iter,1)
       do
          dlx = 0.0
          do i = 1,n
-            if (i .ne. j) then !ten kawałek to jest zwykly lasso
+            if (i .ne. j) then
                a = S(i,j) - WXj(i) + W(i,i)*X(i,j)
                b = abs(a) - L(i,j)
                if (b .gt. 0.0) then
@@ -147,7 +145,6 @@ if (msg .ne. 0)  call intpr('iter:',-1,iter,1)
       W(j,:) = WXj(1:n)
       W(j,j) = 1 + sum(X(:,j)*W(:,j))
    enddo
-!   write(6,*) "  dw =", dw
    if (dw .le. shr) then
       exit
    endif
