@@ -79,7 +79,7 @@ pcglassoFast <- function(
     )
     D <- resD$D
     loss_D[i + 1] <- function_to_optimize(R, D, S, lambda, alpha)
-    stopifnot(loss_D[i + 1] > loss_R[i])
+    stopifnot( loss_D[i + 1] > loss_R[i] - (D.tol * 2) )
 
     resR <- ROptim(
       S = sweep(sweep(S, 1, D, "*"), 2, D, "*"),
@@ -95,14 +95,13 @@ pcglassoFast <- function(
     R_inv <- resR$Rinv
 
     loss_new <- function_to_optimize(R, D, S, lambda, alpha)
-    stop_loop <- (loss_new - loss_old < tolerance)
-    loss_old <- loss_new
+    loss_R[i + 1] <- loss_new
 
-    loss_R[i + 1] <- loss_old
-
-    stopifnot( loss_R[i + 1] > loss_D[i + 1] - (tolerance * 2) )
+    stopifnot( loss_R[i + 1] > loss_D[i + 1] - (R.tol.outer * 2) )
 
     i <- i + 1
+    stop_loop <- (loss_new - loss_old < tolerance)
+    loss_old <- loss_new
   }
 
   loss_R <- loss_R[1:i]
