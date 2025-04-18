@@ -41,9 +41,8 @@
 #' # get a small path of 20 lambdas
 #' resPath <- pcglassoPath(S, alpha,
 #'                         nlambda = 20,
-#'                         lambda.min.ratio = 0.05,
-#'                         trace = TRUE)
-#' str(resPath)
+#'                         lambda.min.ratio = 0.05)
+#' resPath
 pcglassoPath <- function(
     S,
     alpha,

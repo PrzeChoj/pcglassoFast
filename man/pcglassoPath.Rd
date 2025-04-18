@@ -71,9 +71,8 @@ alpha <- 4/20
 # get a small path of 20 lambdas
 resPath <- pcglassoPath(S, alpha,
                         nlambda = 20,
-                        lambda.min.ratio = 0.05,
-                        trace = TRUE)
-str(resPath)
+                        lambda.min.ratio = 0.05)
+resPath
 }
 \seealso{
 \code{\link{pcglassoFast}} for a single‑λ blockwise optimizer.
