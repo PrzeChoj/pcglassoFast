@@ -87,7 +87,7 @@ pcglassoFast <- function(
       max.outer.iter = R.max.outer.iter
     )
     R <- resR$R
-    R_inv <- resR$Qinv
+    R_inv <- resR$Qinv # TODO: Allways NULL?
 
     loss_new <- function_to_optimize(R, D, S, lambda, alpha)
     stop_loop <- (loss_new - loss_old < tolerance)

@@ -75,7 +75,6 @@ enddo
 if (shr .eq. 0.0) then
 !  S is diagonal.
    W = 0.0
-   X = 0.0
    do i = 1,n
       W(i,i) = 1.0
    enddo
@@ -91,8 +90,8 @@ if (thrLasso .lt. 2*EPS) then
    thrLasso = 2*EPS
 end if
 if (warm .eq. 0) then
-   W = 0.0 ! TODO(Sprawdzic, czy nie lepiej z innego)
    X = 0.0 ! X to kwadracik
+   W = 0.0 ! TODO(Sprawdzic, czy nie lepiej z innego)
    do i = 1,n
       W(i,i) = 1.0
    enddo
@@ -146,7 +145,7 @@ if (msg .ne. 0)  call intpr('iter:',-1,iter,1)
       dw = max(dw, sum(abs(WXj(1:n) - W(:,j))))
       W(:,j) = WXj(1:n)
       W(j,:) = WXj(1:n)
-      W(j,j) = 1 + sum(X(:,i)*W(:,i))
+      W(j,j) = 1 + sum(X(:,j)*W(:,j))
    enddo
 !   write(6,*) "  dw =", dw
    if (dw .le. shr) then
