@@ -46,7 +46,7 @@
 #'
 #' alpha <- 4 / 20 # 4 / n, as in PCGLASSO paper
 #'
-#' pcglassoFast(S, 0.11, alpha, max.iter = 1000)
+#' pcglassoFast(S, 0.11, alpha, max.iter = 15)
 pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = NULL, D = rep(1, dim(S)[1]),

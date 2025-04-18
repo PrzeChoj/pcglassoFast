@@ -11,13 +11,13 @@ ROptim <- function(
     Rinv <- solve(R)
   }
 
-  # TODO: tol.inner, max.inner.iter
+  # TODO: tol.inner
 
   p <- dim(R)[1]
   lambda_matrix <- (matrix(rep(1, p * p), ncol = p) - diag(p)) * lambda
   ans <- ROptim_to_fortran(
     S, rho = lambda_matrix, thr = tol.outer, maxIt = max.outer.iter,
-    start = "warm", w.init = Rinv, wi.init = R
+    maxItLasso = max.inner.iter, start = "warm", w.init = Rinv, wi.init = R
   )
 
   R <- ans$wi
@@ -55,7 +55,7 @@ ROptim <- function(
 #' }
 #'
 #' @keywords glasso covariance matrix regularization penalized likelihood
-ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, start = c("cold", "warm"), w.init = NULL, wi.init = NULL, trace = FALSE) {
+ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, maxItLasso = 500, start = c("cold", "warm"), w.init = NULL, wi.init = NULL, trace = FALSE) {
   n <- nrow(S) # dimension of S
   if (is.matrix(rho)) {
     if (length(rho) != n * n) stop("The input matrix for \"rho\" must be of size ", n, " by ", n)
@@ -88,12 +88,12 @@ ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, start = c("cold
   mode(L) <- "double"
   mode(thr) <- "double"
   mode(maxIt) <- "integer"
+  mode(maxItLasso) <- "integer"
   mode(msg) <- "integer"
   mode(is) <- "integer"
   mode(X) <- "double"
   mode(W) <- "double"
   mode(info) <- "integer"
-
 
   LASSO <- .Fortran(
     "roptim",
@@ -102,6 +102,7 @@ ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, start = c("cold
     L,
     thr,
     maxIt,
+    maxItLasso,
     msg,
     is,
     X,
@@ -111,6 +112,6 @@ ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, start = c("cold
     info
   )
 
-  results <- list(w = LASSO[[9]], wi = LASSO[[8]], errflag = LASSO[[12]], niter = LASSO[[5]])
+  results <- list(w = LASSO[[10]], wi = LASSO[[9]], errflag = LASSO[[13]], niter = LASSO[[5]])
   return(results)
 }

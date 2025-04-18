@@ -1,8 +1,8 @@
-      subroutine roptim(n,S,L,thr,maxIt,msg,warm,X,W,Wd,WXj,info)
+      subroutine roptim(n,S,L,thr,maxIt,maxItLasso,msg,warm,X,W,Wd,WXj,info)
 !
 !     .. Scalar Arguments ..
       implicit double precision(a-h, o-z)
-      integer n, warm, msg, maxIt
+      integer n, warm, msg, maxIt, maxItLasso
 !     ..
 !     .. Array Arguments ..
       double precision S(n,n), L(n,n), X(n,n), W(n,n), Wd(n), WXj(n)
@@ -44,6 +44,9 @@
 !         Maximum number of whole matrix sweeps on input, actual number
 !         of sweeps on output
 !
+!  maxItLasso (input) integer
+!         Maximum number of inner LASSO passes per column
+!
 !  msg    (input) integer
 !         Controls amount of messages printed
 !
@@ -68,7 +71,7 @@
 !  Wd, WDXj are not allocatable arrays, because gfortran/gdb has trouble
 !  displaying those.
 
-integer iter
+integer iter, innerIter
 double precision EPS
 parameter (EPS = 1.1e-16)
 info = 0
@@ -101,12 +104,12 @@ if (warm .eq. 0) then
    enddo
 else
    do i = 1,n
-     X(1:n,i) = -X(1:n,i)/X(i,i)
-     X(i,i) = 0
-  end do
+      X(1:n,i) = -X(1:n,i)/X(i,i)
+      X(i,i) = 0
+   end do
 end if
 do iter = 1,maxIt
-if (msg .ne. 0)  call intpr('iter:',-1,iter,1)
+   if (msg .ne. 0)  call intpr('iter:',-1,iter,1)
    dw = 0.0
    do j = 1,n
       WXj(1:n) = 0.0
@@ -116,7 +119,9 @@ if (msg .ne. 0)  call intpr('iter:',-1,iter,1)
             WXj = WXj + W(:,i)*X(i,j)
          endif
       enddo
+      innerIter = 0
       do
+         innerIter = innerIter + 1
          dlx = 0.0
          do i = 1,n
             if (i .ne. j) then
@@ -136,6 +141,9 @@ if (msg .ne. 0)  call intpr('iter:',-1,iter,1)
             endif
          enddo
          if (dlx .lt. thrLasso) then
+            exit
+         endif
+         if (innerIter .ge. maxItLasso) then
             exit
          endif
       enddo
