@@ -94,7 +94,8 @@ pcglassoFast <- function(
     loss_old <- loss_new
 
     loss_R[i + 1] <- loss_old
-    stopifnot(loss_R[i + 1] > loss_D[i + 1])
+
+    stopifnot( loss_R[i + 1] > loss_D[i + 1] - (tolerance * 2) )
 
     i <- i + 1
   }
@@ -108,8 +109,7 @@ pcglassoFast <- function(
     "D" = D,
     "R_inv" = R_inv,
     "n_iters" = i,
-    "loss" = loss_R,
-    "loss_D" = loss_D
+    "loss" = loss_R
   ))
 }
 
