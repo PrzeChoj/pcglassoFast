@@ -56,6 +56,11 @@ pcglassoFast <- function(
     D.tol = 1e-4,
     D.max.starting.iter = 500, D.max.outer.iter = 100) {
   D <- rep(1, dim(S)[1])
+
+  if (is.null(R_inv)) {
+    R_inv = solve(R)
+  }
+
   stop_loop <- FALSE
   i <- 1
   loss_R <- rep(0, max.iter)
@@ -79,8 +84,8 @@ pcglassoFast <- function(
     resR <- ROptim(
       S = sweep(sweep(S, 1, D, "*"), 2, D, "*"),
       R = R,
-      lambda = lambda,
       Rinv = R_inv,
+      lambda = lambda,
       tol.inner = R.tol.inner,
       tol.outer = R.tol.outer,
       max.inner.iter = R.max.inner.iter,
