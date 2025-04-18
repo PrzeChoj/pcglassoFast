@@ -2,7 +2,7 @@
 #' blockwise optimization for pcglasso
 #'
 #' @param S (p x p matrix) empirical covariance matrix derived from the data.
-#' @param lambda,alpha (double \eqn{0\le\lambda}, double \eqn{0\le\alpha < 1})
+#' @param lambda,alpha (double \eqn{0\le\lambda}, double \eqn{\alpha \in \mathbb{R}})
 #'         Parameters of the method. See Details section below.
 #'   * \eqn{\lambda} is a penalty for off-diagonal
 #'   * \eqn{\alpha} is a penalty for on-diagonal
@@ -34,6 +34,8 @@
 #' * "D" - found diagonal matrix
 #' * "n_iters" - number of iterations of the outer loop
 #' @md
+#'
+#' @seealso [pcglassoPath()] to compute a full λ‑path of solutions
 #'
 #' @export
 #' @examples

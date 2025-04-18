@@ -25,7 +25,7 @@ pcglassoFast(
 \arguments{
 \item{S}{(p x p matrix) empirical covariance matrix derived from the data.}
 
-\item{lambda, alpha}{(double \eqn{0\le\lambda}, double \eqn{0\le\alpha < 1})
+\item{lambda, alpha}{(double \eqn{0\le\lambda}, double \eqn{\alpha \in \mathbb{R}})
 Parameters of the method. See Details section below.
 \itemize{
 \item \eqn{\lambda} is a penalty for off-diagonal
@@ -79,5 +79,8 @@ S <- solve(S_inv.true) # data
 
 alpha <- 4 / 20 # 4 / n, as in PCGLASSO paper
 
-pcglassoFast(S, 0.11, alpha, max.iter = 1000)
+pcglassoFast(S, 0.11, alpha, max.iter = 15)
+}
+\seealso{
+\code{\link[=pcglassoPath]{pcglassoPath()}} to compute a full λ‑path of solutions
 }

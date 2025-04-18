@@ -46,6 +46,8 @@ ROptim <- function(
 #' @param wi.init Optional starting values for the inverse covariance matrix (p x p). Used only for warm starts.
 #' @param trace Logical. If \code{TRUE}, prints iteration info.
 #'
+#' @noRd
+#'
 #' @return A list with the following components:
 #' \describe{
 #'   \item{w}{Estimated covariance matrix}
