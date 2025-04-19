@@ -119,18 +119,18 @@ pcglassoPath <- function(
     Rinv_curr <- fit$R_inv
     D_curr <- fit$D
 
+    # record
+    outR[[k]] <- R_curr
+    outD[[k]] <- D_curr
+    outW[[k]] <- diag(D_curr) %*% R_curr %*% diag(D_curr)
+    losses[k] <- tail(fit$loss, 1)
+
     # compute edge fraction and early stop
     off_nz <- sum(R_curr != 0) - p
     edge_frac <- off_nz / (p * (p - 1))
     if (edge_frac > max.edge.fraction) {
       break
     }
-
-    # record
-    outR[[k]] <- R_curr
-    outD[[k]] <- D_curr
-    outW[[k]] <- diag(D_curr) %*% R_curr %*% diag(D_curr)
-    losses[k] <- tail(fit$loss, 1)
   }
 
   # trim to actual length
