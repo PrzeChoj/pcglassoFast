@@ -150,3 +150,47 @@ pcglassoPath <- function(
     loss    = losses
   )
 }
+
+
+#' Loss evaluation
+#'
+#' @description
+#' computes the loss for the solution of the pcglassoPath, or a list or an array of
+#' matrices
+#' the BIC_gamma is from Extended Bayesian Information Criteria for Gaussian
+#' Graphical Models
+#' @param Precision.array (p x p x k)
+#' @param Sigma (p x p) the covariance matrix
+#' @param n     (int)   number of observations
+#' @param gamma (1 x 1) scaling parameter for \eqn{BIC_{gamma}}
+#' @return list (k x 1) $loglik the average loglikelihood
+#'                      $forbenious
+#'                      $n.param
+#'                      $BIC_gamma the average BIC_gamma
+#'@export
+loss.evaluation <- function(Precision.array, Sigma,n ,gamma=0.5){
+
+  if("list"%in%is(Precision.array)){
+    W <- Precision.array$W_path
+    Precision.array <- simplify2array(W)
+  }
+  k <- dim(Precision.array)[3]
+  p <- dim(Precision.array)[1]
+  loglik <- forbenious <- n.param <- BIC_gamma <- nEdges <-rep(0,k)
+
+  for(i in 1:k){
+    P <- Precision.array[,,i]
+    L.P <- chol(P)
+    loglik[i] <- (sum(log(diag(L.P))) - 0.5 * sum(diag(P%*%Sigma)) - 0.5 * p * log(2 * pi))
+    forbenious[i] <- sum((solve(P)- Sigma)^2)
+    n.param[i] <- (p * p - sum(P==0) - p)/2 + p
+    nEdges[i] <- (sum(P!=0)-p)/2
+    BIC_gamma[i] <- -2 * loglik[i]  + nEdges[i] * (log(n) + 4 * gamma * log(p))
+  }
+
+  return(list(loglik     = loglik,
+              forbenious = forbenious,
+              n.param    = n.param,
+              BIC_gamma = BIC_gamma,
+              nEdges = nEdges))
+}
