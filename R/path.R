@@ -85,6 +85,7 @@ pcglassoPath <- function(
   outR <- vector("list", length(lambdas))
   outD <- vector("list", length(lambdas))
   outW <- vector("list", length(lambdas))
+  iters <- vector("numeric", length(lambdas))
   losses <- numeric(length(lambdas))
 
   # warm start
@@ -123,6 +124,7 @@ pcglassoPath <- function(
     outR[[k]] <- R_curr
     outD[[k]] <- D_curr
     outW[[k]] <- diag(D_curr) %*% R_curr %*% diag(D_curr)
+    iters[k] <- fit$n_iters
     losses[k] <- tail(fit$loss, 1)
 
     # compute edge fraction and early stop
@@ -140,6 +142,7 @@ pcglassoPath <- function(
   outD <- outD[1:n_used]
   outW <- outW[1:n_used]
   losses <- losses[1:n_used]
+  iters <- iters[1:n_used]
 
   names(outR) <- names(outD) <- names(outW) <- paste0("lam_", round(lambdas, 4))
   list(
@@ -147,7 +150,8 @@ pcglassoPath <- function(
     R_path  = outR,
     D_path  = outD,
     W_path  = outW,
-    loss    = losses
+    loss    = losses,
+    iters = iters
   )
 }
 
@@ -181,7 +185,7 @@ loss.evaluation <- function(Precision.array, Sigma,n ,gamma=0.5){
   for(i in 1:k){
     P <- Precision.array[,,i]
     L.P <- chol(P)
-    loglik[i] <- (sum(log(diag(L.P))) - 0.5 * sum(diag(P%*%Sigma)) - 0.5 * p * log(2 * pi))
+    loglik[i] <- n*(sum(log(diag(L.P))) - 0.5 * sum(diag(P%*%Sigma)) - 0.5 * p * log(2 * pi))
     forbenious[i] <- sum((solve(P)- Sigma)^2)
     n.param[i] <- (p * p - sum(P==0) - p)/2 + p
     nEdges[i] <- (sum(P!=0)-p)/2

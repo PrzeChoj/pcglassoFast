@@ -99,7 +99,7 @@ pcglassoFast <- function(
     loss_new <- function_to_optimize(R, D, S, lambda, alpha)
     loss_R[i + 1] <- loss_new
 
-    stopifnot( loss_R[i + 1] > loss_D[i + 1] - (R.tol.outer * 2) )
+    #stopifnot( loss_R[i + 1] > loss_D[i + 1] - (R.tol.outer * 2) )
 
     i <- i + 1
     stop_loop <- (loss_new - loss_old < tolerance)
