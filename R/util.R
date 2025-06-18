@@ -152,10 +152,14 @@ compare_matrices <- function(Q, Q.est) {
   # false positive/negative rates
   # false positive: Q==0 & Q.est!=0 among Q==0
   n_fp <- sum(mask_zero & (Q.est != 0))
+  n_tp <- sum(mask_zero & (Q.est == 0))
   false_non0_rate <- if (n_zero>0) n_fp / n_zero else NA_real_
+  true_non0_rate   <- if (n_zero>0) n_tp / n_zero else NA_real_
   # false negative: Q!=0 & Q.est==0 among Q!=0
   n_fn <- sum(mask_nz & (Q.est == 0))
+  n_tn <- sum(mask_nz & (Q.est != 0))
   false_0_rate <- if (n_nz>0) n_fn / n_nz else NA_real_
+  true_0_rate   <- if (n_nz>0) n_tn / n_nz else NA_real_
 
   data.frame(
     frob_norm,
@@ -166,8 +170,10 @@ compare_matrices <- function(Q, Q.est) {
     rmse_offdiag_zero,
     frob_offdiag_nonzero,
     rmse_offdiag_nonzero,
+    true_non0_rate,
     false_non0_rate,
     false_0_rate,
+    true_0_rate,
     row.names = NULL,
     stringsAsFactors = FALSE
   )
