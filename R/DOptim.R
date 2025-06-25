@@ -16,7 +16,7 @@ DOptim <- function(
 
 # TODO: Check, maybe the previous optimal D would be
 # a better starting point for this algorithm than e.
-#' @importFrom rlang abort
+#' @importFrom rlang warn
 get_good_starting_point <- function(A, max_iter = 100) {
   myNorm <- function(A, x) {
     e <- rep(1, ncol(A))
