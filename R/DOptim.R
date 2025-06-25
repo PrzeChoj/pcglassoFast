@@ -76,6 +76,9 @@ gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, 
     val.star <- -Inf
     grad <- gradient.d(d, A, alpha)
     H <- hessian.diag.d(d, diag.A, alpha)
+    if (any(H >= 0)) {
+      rlang::warn("Hesian should be negarively definite. This should not occur. Please open issue to let us know.")
+    }
     eps <- 1e-8
     H.safe <- H - eps
     H.inv.g <- -grad / H.safe
@@ -93,7 +96,7 @@ gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, 
     } else {
       inner_fail <- TRUE
       # Should not happen.
-      warning("Fail of the inner iteration of optimization process for diagonal. This should not occur. Please open issue to let us know.")
+      rlang::warn("Fail of the inner iteration of optimization process for diagonal. This should not occur. Please open issue to let us know.")
     }
 
     iter <- iter + 1
