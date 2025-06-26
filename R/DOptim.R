@@ -7,7 +7,8 @@ DOptim <- function(
     max.outer.iter = 100,
     alpha = 0) {
   if (is.null(D0)) {
-    D0 <- get_good_starting_point(A, max.starting.iter)
+    #D0 <- get_good_starting_point(A, max.starting.iter)
+    D0 <- rep(1, ncol(A))
   }
   Res <- gradient.line.diagH.search(D0, A, alpha, tol = tol, max_iter = max.outer.iter, max_inner = 15)
   return(Res)
@@ -77,7 +78,7 @@ gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, 
     grad <- gradient.d(d, A, alpha)
     H <- hessian.diag.d(d, diag.A, alpha)
     if (any(H >= 0)) {
-      rlang::warn("Hesian should be negarively definite. This should not occur. Please open issue to let us know.")
+      rlang::warn("Hessian should be negative definite. This should not occur. Please open issue to let us know.")
     }
     eps <- 1e-8
     H.safe <- H - eps

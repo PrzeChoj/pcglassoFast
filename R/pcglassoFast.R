@@ -46,7 +46,7 @@
 #'
 #' S <- solve(S_inv.true) # data
 #'
-#' alpha <- 4 / 20 # 4 / n, as in PCGLASSO paper
+#' alpha <- 4 / 20 # 4 / n, as in Carter's paper
 #'
 #' pcglassoFast(S, 0.11, alpha, max.iter = 15)
 pcglassoFast <- function(
@@ -81,7 +81,10 @@ pcglassoFast <- function(
     )
     D <- resD$D
     loss_D[i + 1] <- function_to_optimize(R, D, S, lambda, alpha)
-    stopifnot( loss_D[i + 1] > loss_R[i] - (D.tol * 2) )
+
+    if (loss_D[i + 1] <= loss_R[i] - (D.tol * 2)) {
+      rlang::warn("This should not occur. Please open issue to let us know.")
+    }
 
     resR <- ROptim(
       S = sweep(sweep(S, 1, D, "*"), 2, D, "*"),
@@ -99,7 +102,9 @@ pcglassoFast <- function(
     loss_new <- function_to_optimize(R, D, S, lambda, alpha)
     loss_R[i + 1] <- loss_new
 
-    #stopifnot( loss_R[i + 1] > loss_D[i + 1] - (R.tol.outer * 2) )
+    if (loss_R[i + 1] <= loss_D[i + 1] - (R.tol.outer * 2)) {
+      rlang::warn("This should not occur. Please open issue to let us know.")
+    }
 
     i <- i + 1
     stop_loop <- (loss_new - loss_old < tolerance)
@@ -111,6 +116,7 @@ pcglassoFast <- function(
   D <- as.vector(D)
   return(list(
     "Sinv" = diag(D) %*% R %*% diag(D),
+    "S" = diag(1/D) %*% R_inv %*% diag(1/D),
     "R" = R,
     "D" = D,
     "R_inv" = R_inv,
@@ -138,6 +144,6 @@ function_to_optimize <- function(R, d, S, lambda, alpha) {
 
 #' compute tr(DSDR) where D are diagonal matrices
 trace_DSDR <- function(d, S, R) {
-  # return(sum(c(S)*rep(d,times=length(d))*rep(d,each=length(d))*c(R)))
-  return(sum(d * (S * R) %*% d))
+  #return(sum(c(S)*rep(d,times=length(d))*rep(d,each=length(d))*c(R)))
+  return(sum(d * ((S * R) %*% d)))
 }
