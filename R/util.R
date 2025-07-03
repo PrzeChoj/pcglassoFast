@@ -17,23 +17,23 @@
 #' # 2D example
 #' Sigma <- matrix(c(4, 1.2, 1.2, 9), 2, 2)
 #' C     <- cov2cor(Sigma)
-#' Sigma2 <- cov2cor.inv(C, diag(Sigma))
+#' Sigma2 <- cov2cor_inv(C, diag(Sigma))
 #' all.equal(Sigma, Sigma2)
 #'
 #' # 3D example: two correlation matrices sharing the same variances
 #' C3 <- array(0, c(2,2,2))
 #' C3[,,1] <- diag(2)
 #' C3[,,2] <- cov2cor(Sigma)
-#' S3 <- cov2cor.inv(C3, diag(Sigma))
+#' S3 <- cov2cor_inv(C3, diag(Sigma))
 #' dim(S3)  # 2 2 2
 #'
 #' # 3D with slice‐specific variances
 #' vars <- cbind(c(4,9), c(1,16))  # 2×2: first slice variances (4,9), second (1,16)
-#' S4 <- cov2cor.inv(C3, vars)
+#' S4 <- cov2cor_inv(C3, vars)
 #' all(dim(S4)==c(2,2,2))
 #'
 #' @export
-cov2cor.inv <- function(C, diagSigma) {
+cov2cor_inv <- function(C, diagSigma) {
   # check C
   if (!is.numeric(C) || length(dim(C)) < 2 || dim(C)[1] != dim(C)[2]) {
     stop("`C` must be a numeric p×p matrix or p×p×k array.")
@@ -83,21 +83,21 @@ cov2cor.inv <- function(C, diagSigma) {
 
 #' Compare two symmetric matrices via Frobenius norms, RMSE, and error rates
 #'
-#' Given a true symmetric matrix Q and its estimate Q.est (both p×p),
+#' Given a true symmetric matrix Q and its estimate Q_est (both p×p),
 #' this function computes:
-#' 1. `frob_norm`: overall Frobenius norm \(\|Q.est - Q\|_F\).
-#' 2. `rmse`: root-mean-square error per element: \(\sqrt{\sum_{i,j}(Q.est - Q)^2 / p^2}\).
+#' 1. `frob_norm`: overall Frobenius norm \(\|Q_est - Q\|_F\).
+#' 2. `rmse`: root-mean-square error per element: \(\sqrt{\sum_{i,j}(Q_est - Q)^2 / p^2}\).
 #' 3. `frob_diag`: Frobenius norm of diagonal differences.
-#' 4. `rmse_diag`: RMSE on diagonal: \(\sqrt{\sum_{i}(Q.est_{ii} - Q_{ii})^2 / p}\).
+#' 4. `rmse_diag`: RMSE on diagonal: \(\sqrt{\sum_{i}(Q_est_{ii} - Q_{ii})^2 / p}\).
 #' 5. `frob_offdiag_zero`: Frobenius norm on off-diagonal entries where Q_{ij} == 0.
 #' 6. `rmse_offdiag_zero`: RMSE on those off-diagonal zero entries: divide by number of such pairs.
 #' 7. `frob_offdiag_nonzero`: Frobenius norm on off-diagonal entries where Q_{ij} != 0.
 #' 8. `rmse_offdiag_nonzero`: RMSE on those off-diagonal nonzero entries.
-#' 9. `false_pos_rate`: proportion of truly-zero entries with Q.est != 0.
-#'10.' `false_neg_rate`: proportion of truly-nonzero entries with Q.est == 0.
+#' 9. `false_pos_rate`: proportion of truly-zero entries with Q_est != 0.
+#' 10. `false_neg_rate`: proportion of truly-nonzero entries with Q_est == 0.
 #'
 #' @param Q Numeric p×p symmetric matrix of true values.
-#' @param Q.est Numeric p×p symmetric matrix of estimates; must match dims of Q.
+#' @param Q_est Numeric p×p symmetric matrix of estimates; must match dims of Q.
 #' @return A one-row `data.frame` with the above metrics.
 #' @examples
 #' set.seed(1)
@@ -105,24 +105,25 @@ cov2cor.inv <- function(C, diagSigma) {
 #' M <- matrix(rnorm(p^2), p, p)
 #' Q <- (M + t(M)) / 2
 #' diag(Q) <- runif(p, 0, 2)
-#' Q[1, 3] <- 0  # enforce some zeros
+#' Q[1, 3] <- Q[3, 1] <- 0  # enforce some zeros
 #' Q <- (Q + t(Q)) / 2
 #' E <- Q + matrix(rnorm(p^2, 0, 0.1), p, p)
 #' E <- (E + t(E)) / 2
-#' E[2,4] <- 0     # drop one entry
+#' E[2, 4] <- E[4, 2] <- 0     # drop one entry
 #' compare_matrices(Q, E)
+#' @md
 #' @export
-compare_matrices <- function(Q, Q.est) {
-  if (!is.matrix(Q) || !is.matrix(Q.est) || any(dim(Q) != dim(Q.est))) {
-    stop("Q and Q.est must be numeric matrices of the same dimensions.")
+compare_matrices <- function(Q, Q_est) {
+  if (!is.matrix(Q) || !is.matrix(Q_est) || any(dim(Q) != dim(Q_est))) {
+    stop("Q and Q_est must be numeric matrices of the same dimensions.")
   }
   p <- nrow(Q)
   # ensure symmetry
   if (any(abs(Q - t(Q)) > sqrt(.Machine$double.eps))) stop("Q must be symmetric.")
-  if (any(abs(Q.est - t(Q.est)) > sqrt(.Machine$double.eps))) stop("Q.est must be symmetric.")
+  if (any(abs(Q_est - t(Q_est)) > sqrt(.Machine$double.eps))) stop("Q_est must be symmetric.")
 
   # elementwise difference
-  D <- Q.est - Q
+  D <- Q_est - Q
 
   # 1) overall Frobenius norm
   frob_norm <- sqrt(sum(D^2))
@@ -150,14 +151,14 @@ compare_matrices <- function(Q, Q.est) {
   rmse_offdiag_nonzero <- if (n_nz>0) sqrt(sq_nz / n_nz) else NA_real_
 
   # false positive/negative rates
-  # false positive: Q==0 & Q.est!=0 among Q==0
-  n_fp <- sum(mask_zero & (Q.est != 0))
-  n_tp <- sum(mask_zero & (Q.est == 0))
+  # false positive: Q==0 & Q_est!=0 among Q==0
+  n_fp <- sum(mask_zero & (Q_est != 0))
+  n_tp <- sum(mask_zero & (Q_est == 0))
   false_non0_rate <- if (n_zero>0) n_fp / n_zero else NA_real_
   true_non0_rate   <- if (n_zero>0) n_tp / n_zero else NA_real_
-  # false negative: Q!=0 & Q.est==0 among Q!=0
-  n_fn <- sum(mask_nz & (Q.est == 0))
-  n_tn <- sum(mask_nz & (Q.est != 0))
+  # false negative: Q!=0 & Q_est==0 among Q!=0
+  n_fn <- sum(mask_nz & (Q_est == 0))
+  n_tn <- sum(mask_nz & (Q_est != 0))
   false_0_rate <- if (n_nz>0) n_fn / n_nz else NA_real_
   true_0_rate   <- if (n_nz>0) n_tn / n_nz else NA_real_
 
