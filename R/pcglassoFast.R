@@ -1,4 +1,3 @@
-######
 #' blockwise optimization for pcglasso
 #'
 #' @param S (p x p matrix) empirical covariance matrix derived from the data.
@@ -10,11 +9,11 @@
 #'         precision matrix (it is recommended to left it default).
 #' @param D (vector of length p) diagonal of initial estimation of diagonal
 #'         matrix (it is recommended to left it default).
-#' @param max.iter (integer) maximum number of iterations.
+#' @param max_iter (integer) maximum number of iterations.
 #' @param tolerance (double) tolerance for convergence.
-#' @param R.tol.inner,R.tol.outer,R.max.inner.iter,R.max.outer.iter
+#' @param tol_R_inner,tol_R_outer,max_iter_R_inner,max_iter_R_outer
 #'         Parameters passed to [ROptim()] function.
-#' @param D.tol,D.max.starting.iter,D.max.outer.iter
+#' @param tol_D,max_iter_D_newton,max_iter_D_ls
 #'         Parameters passed to [DOptim()] function.
 #'
 #' @details
@@ -48,53 +47,54 @@
 #'
 #' alpha <- 4 / 20 # 4 / n, as in Carter's paper
 #'
-#' pcglassoFast(S, 0.11, alpha, max.iter = 15)
+#' pcglassoFast(S, 0.11, alpha, max_iter = 15)
 pcglassoFast <- function(
     S, lambda, alpha,
-    R = diag(dim(S)[1]), R_inv = NULL, D = rep(1, dim(S)[1]),
-    max.iter = 100, tolerance = 1e-6,
-    R.tol.inner = 1e-2, R.tol.outer = 1e-3,
-    R.max.inner.iter = 10, R.max.outer.iter = 100,
-    D.tol = 1e-4,
-    D.max.starting.iter = 500, D.max.outer.iter = 100) {
-  D <- rep(1, dim(S)[1])
-
-  if (is.null(R_inv)) {
-    R_inv = solve(R)
-  }
+    R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
+    max_iter = 100, tolerance = 1e-6,
+    tol_R_inner = 1e-2, tol_R_outer = 1e-3,
+    max_iter_R_inner = 10, max_iter_R_outer = 100,
+    tol_D = 1e-4,
+    max_iter_D_newton = 500, max_iter_D_ls = 100) {
+  stopifnot(
+    is.matrix(S), nrow(S) == ncol(S),
+    is.numeric(lambda), lambda >= 0,
+    is.numeric(alpha),
+    max_iter >= 1, tolerance > 0
+  )
 
   stop_loop <- FALSE
   i <- 1
-  loss_R <- rep(0, max.iter)
-  loss_D <- rep(0, max.iter)
+  loss_R <- numeric(1)
+  loss_D <- numeric(1)
   loss_old <- function_to_optimize(R, D, S, lambda, alpha)
   loss_R[1] <- loss_old
   loss_D[1] <- loss_old
-  while (!stop_loop & i < max.iter) {
+  while (!stop_loop && i < max_iter) {
     resD <- DOptim(
       A = R * S,
       d0 = D,
-      tol = D.tol,
-      max_newton_iter = D.max.starting.iter,
-      max_ls_steps = D.max.outer.iter,
+      tol = tol_D,
+      max_newton_iter = max_iter_D_newton,
+      max_ls_steps = max_iter_D_ls,
       alpha = alpha
     )
     D <- resD$D
     loss_D[i + 1] <- function_to_optimize(R, D, S, lambda, alpha)
 
-    if (loss_D[i + 1] <= loss_R[i] - (D.tol * 2)) {
+    if (loss_D[i + 1] <= loss_R[i] - (tol_D * 2)) {
       rlang::warn("This should not occur. Please open issue to let us know.")
     }
 
     resR <- ROptim(
-      S = sweep(sweep(S, 1, D, "*"), 2, D, "*"),
+      S = S * (D %o% D),
       R = R,
       Rinv = R_inv,
       lambda = lambda,
-      tol_inner = R.tol.inner,
-      tol_outer = R.tol.outer,
-      max_inner_iter = R.max.inner.iter,
-      max_outer_iter = R.max.outer.iter
+      tol_inner = tol_R_inner,
+      tol_outer = tol_R_outer,
+      max_inner_iter = max_iter_R_inner,
+      max_outer_iter = max_iter_R_outer
     )
     R <- resR$R
     R_inv <- resR$Rinv
@@ -102,7 +102,7 @@ pcglassoFast <- function(
     loss_new <- function_to_optimize(R, D, S, lambda, alpha)
     loss_R[i + 1] <- loss_new
 
-    if (loss_R[i + 1] <= loss_D[i + 1] - (R.tol.outer * 2)) {
+    if (loss_R[i + 1] <= loss_D[i + 1] - (tol_R_outer * 2)) {
       rlang::warn("This should not occur. Please open issue to let us know.")
     }
 
@@ -111,18 +111,16 @@ pcglassoFast <- function(
     loss_old <- loss_new
   }
 
-  loss_R <- loss_R[1:i]
-  loss_D <- loss_D[1:i]
   D <- as.vector(D)
-  return(list(
-    "Sinv" = diag(D) %*% R %*% diag(D),
-    "S" = diag(1/D) %*% R_inv %*% diag(1/D),
+  list(
+    "Sinv" = R * (D %o% D),
+    "S" = R_inv * ((1/D) %o% (1/D)),
     "R" = R,
     "D" = D,
     "R_inv" = R_inv,
     "n_iters" = i,
     "loss" = loss_R
-  ))
+  )
 }
 
 
@@ -144,6 +142,5 @@ function_to_optimize <- function(R, d, S, lambda, alpha) {
 
 #' compute tr(DSDR) where D are diagonal matrices
 trace_DSDR <- function(d, S, R) {
-  #return(sum(c(S)*rep(d,times=length(d))*rep(d,each=length(d))*c(R)))
-  return(sum(d * ((S * R) %*% d)))
+  sum(d * ((S * R) %*% d))
 }
