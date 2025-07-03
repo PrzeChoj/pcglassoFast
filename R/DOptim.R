@@ -91,7 +91,7 @@ gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, 
       inner.iter <- inner.iter + 1
       stepsize <- stepsize * 0.5
     }
-    if (val.star > val.old) {
+    if (val.star >= val.old) {
       d <- d.star
       val <- val.star
     } else {
