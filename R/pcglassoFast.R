@@ -39,7 +39,7 @@
 #' @export
 #' @examples
 #' p <- 7
-#' R.true <- toeplitz(c(c(1, -0.5), rep(0, p-2)))
+#' R.true <- toeplitz(c(c(1, -0.5), rep(0, p - 2)))
 #' D.true <- sqrt(rchisq(p, 3))
 #' S_inv.true <- diag(D.true) %*% R.true %*% diag(D.true)
 #'
@@ -114,7 +114,7 @@ pcglassoFast <- function(
   D <- as.vector(D)
   list(
     "Sinv" = R * (D %o% D),
-    "S" = R_inv * ((1/D) %o% (1/D)),
+    "S" = R_inv * ((1 / D) %o% (1 / D)),
     "R" = R,
     "D" = D,
     "R_inv" = R_inv,

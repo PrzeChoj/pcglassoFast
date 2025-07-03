@@ -16,21 +16,21 @@
 #' @examples
 #' # 2D example
 #' Sigma <- matrix(c(4, 1.2, 1.2, 9), 2, 2)
-#' C     <- cov2cor(Sigma)
+#' C <- cov2cor(Sigma)
 #' Sigma2 <- cov2cor_inv(C, diag(Sigma))
 #' all.equal(Sigma, Sigma2)
 #'
 #' # 3D example: two correlation matrices sharing the same variances
-#' C3 <- array(0, c(2,2,2))
-#' C3[,,1] <- diag(2)
-#' C3[,,2] <- cov2cor(Sigma)
+#' C3 <- array(0, c(2, 2, 2))
+#' C3[, , 1] <- diag(2)
+#' C3[, , 2] <- cov2cor(Sigma)
 #' S3 <- cov2cor_inv(C3, diag(Sigma))
-#' dim(S3)  # 2 2 2
+#' dim(S3) # 2 2 2
 #'
 #' # 3D with slice‐specific variances
-#' vars <- cbind(c(4,9), c(1,16))  # 2×2: first slice variances (4,9), second (1,16)
+#' vars <- cbind(c(4, 9), c(1, 16)) # 2×2: first slice variances (4,9), second (1,16)
 #' S4 <- cov2cor_inv(C3, vars)
-#' all(dim(S4)==c(2,2,2))
+#' all(dim(S4) == c(2, 2, 2))
 #'
 #' @export
 cov2cor_inv <- function(C, diagSigma) {
@@ -39,7 +39,7 @@ cov2cor_inv <- function(C, diagSigma) {
     stop("`C` must be a numeric p×p matrix or p×p×k array.")
   }
   p <- dim(C)[1]
-  k <- if (length(dim(C))==3) dim(C)[3] else 1L
+  k <- if (length(dim(C)) == 3) dim(C)[3] else 1L
 
   # check diagSigma
   if (is.matrix(diagSigma)) {
@@ -48,11 +48,11 @@ cov2cor_inv <- function(C, diagSigma) {
     }
     vars_mat <- diagSigma
   } else {
-    if (!is.numeric(diagSigma) || length(diagSigma)!=p) {
+    if (!is.numeric(diagSigma) || length(diagSigma) != p) {
       stop("`diagSigma` must be a vector of length p or a p×k matrix matching C.")
     }
     # replicate the same variances across k slices
-    vars_mat <- matrix(diagSigma, nrow=p, ncol=k)
+    vars_mat <- matrix(diagSigma, nrow = p, ncol = k)
   }
 
   # function to build one covariance from one slice
@@ -63,7 +63,7 @@ cov2cor_inv <- function(C, diagSigma) {
 
   if (k == 1L) {
     # 2D case
-    Sigma <- makeSigma(C, vars_mat[,1])
+    Sigma <- makeSigma(C, vars_mat[, 1])
     dn <- rownames(C)
     if (!is.null(dn)) rownames(Sigma) <- colnames(Sigma) <- dn
     return(Sigma)
@@ -72,9 +72,9 @@ cov2cor_inv <- function(C, diagSigma) {
     out <- array(0, c(p, p, k))
     dimnames_C <- dimnames(C)
     for (i in seq_len(k)) {
-      out[,,i] <- makeSigma(C[,,i], vars_mat[,i])
+      out[, , i] <- makeSigma(C[, , i], vars_mat[, i])
       if (!is.null(dimnames_C[[1]])) {
-        rownames(out[,,i]) <- colnames(out[,,i]) <- dimnames_C[[1]]
+        rownames(out[, , i]) <- colnames(out[, , i]) <- dimnames_C[[1]]
       }
     }
     return(out)
@@ -105,11 +105,11 @@ cov2cor_inv <- function(C, diagSigma) {
 #' M <- matrix(rnorm(p^2), p, p)
 #' Q <- (M + t(M)) / 2
 #' diag(Q) <- runif(p, 0, 2)
-#' Q[1, 3] <- Q[3, 1] <- 0  # enforce some zeros
+#' Q[1, 3] <- Q[3, 1] <- 0 # enforce some zeros
 #' Q <- (Q + t(Q)) / 2
 #' E <- Q + matrix(rnorm(p^2, 0, 0.1), p, p)
 #' E <- (E + t(E)) / 2
-#' E[2, 4] <- E[4, 2] <- 0     # drop one entry
+#' E[2, 4] <- E[4, 2] <- 0 # drop one entry
 #' compare_matrices(Q, E)
 #' @md
 #' @export
@@ -138,29 +138,29 @@ compare_matrices <- function(Q, Q_est) {
   # off-diagonal masks
   off <- row(Q) != col(Q)
   mask_zero <- (Q == 0) & off
-  mask_nz   <- (Q != 0) & off
+  mask_nz <- (Q != 0) & off
   # Frobenius and RMSE for off diag zeros
   n_zero <- sum(mask_zero)
   sq_zero <- sum(D[mask_zero]^2)
-  frob_offdiag_zero    <- sqrt(sq_zero)
-  rmse_offdiag_zero    <- if (n_zero>0) sqrt(sq_zero / n_zero) else NA_real_
+  frob_offdiag_zero <- sqrt(sq_zero)
+  rmse_offdiag_zero <- if (n_zero > 0) sqrt(sq_zero / n_zero) else NA_real_
   # for nonzeros
   n_nz <- sum(mask_nz)
   sq_nz <- sum(D[mask_nz]^2)
   frob_offdiag_nonzero <- sqrt(sq_nz)
-  rmse_offdiag_nonzero <- if (n_nz>0) sqrt(sq_nz / n_nz) else NA_real_
+  rmse_offdiag_nonzero <- if (n_nz > 0) sqrt(sq_nz / n_nz) else NA_real_
 
   # false positive/negative rates
   # false positive: Q==0 & Q_est!=0 among Q==0
   n_fp <- sum(mask_zero & (Q_est != 0))
   n_tp <- sum(mask_zero & (Q_est == 0))
-  false_non0_rate <- if (n_zero>0) n_fp / n_zero else NA_real_
-  true_non0_rate   <- if (n_zero>0) n_tp / n_zero else NA_real_
+  false_non0_rate <- if (n_zero > 0) n_fp / n_zero else NA_real_
+  true_non0_rate <- if (n_zero > 0) n_tp / n_zero else NA_real_
   # false negative: Q!=0 & Q_est==0 among Q!=0
   n_fn <- sum(mask_nz & (Q_est == 0))
   n_tn <- sum(mask_nz & (Q_est != 0))
-  false_0_rate <- if (n_nz>0) n_fn / n_nz else NA_real_
-  true_0_rate   <- if (n_nz>0) n_tn / n_nz else NA_real_
+  false_0_rate <- if (n_nz > 0) n_fn / n_nz else NA_real_
+  true_0_rate <- if (n_nz > 0) n_tn / n_nz else NA_real_
 
   data.frame(
     frob_norm,

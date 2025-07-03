@@ -16,7 +16,8 @@ ROptim <- function(
   p <- dim(R)[1]
   lambda_matrix <- matrix(lambda, p, p); diag(lambda_matrix) <- 0
   ans <- ROptim_to_fortran(
-    S, rho = lambda_matrix, thr = tol_outer, maxIt = max_outer_iter,
+    S,
+    rho = lambda_matrix, thr = tol_outer, maxIt = max_outer_iter,
     maxItLasso = max_inner_iter, start = "warm", w.init = Rinv, wi.init = R
   )
 
@@ -67,18 +68,20 @@ ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, maxItLasso = 50
   }
 
   # cold or warm start
-  switch(
-    match.arg(start),
+  switch(match.arg(start),
     cold = {
       is_flag <- 0
       W <- X <- matrix(0, n, n)
     },
     warm = {
       is_flag <- 1
-      if (is.null(w.init) || is.null(wi.init))
+      if (is.null(w.init) || is.null(wi.init)) {
         stop("Warm start specified: w.init and wi.init must be non-null")
-      W <- w.init; X <- wi.init
-  })
+      }
+      W <- w.init
+      X <- wi.init
+    }
+  )
 
   Wd <- WXj <- numeric(n)
 

@@ -69,10 +69,10 @@ graph density exceeds \code{max_edge_fraction}.
 }
 \examples{
 p <- 7
-R.true <- toeplitz(c(1, -0.5, rep(0, p-2)))
+R.true <- toeplitz(c(1, -0.5, rep(0, p - 2)))
 D.true <- sqrt(rchisq(p, df = 3))
 S <- solve(diag(D.true) \%*\% R.true \%*\% diag(D.true))
-alpha <- 4/20
+alpha <- 4 / 20
 
 # get a small path of 20 lambdas but stop when >40\% edges
 resPath <- pcglassoPath(

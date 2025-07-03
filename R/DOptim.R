@@ -9,28 +9,32 @@
 #' @param max_ls_steps max line-search iterations
 #' @param alpha regularization parameter
 #' @return list with D, iterations, and final value
-DOptim <- function(A,
-                   d0 = NULL,
-                   tol = 1e-4,
-                   max_newton_iter = 100,
-                   max_ls_steps = 15,
-                   alpha = 0) {
+DOptim <- function(
+    A,
+    d0 = NULL,
+    tol = 1e-4,
+    max_newton_iter = 100,
+    max_ls_steps = 15,
+    alpha = 0) {
   if (is.null(d0)) {
     d0 <- rep(1, ncol(A))
   }
 
-  gradient_line_search(d0, A, alpha,
-                       tol = tol,
-                       max_iter = max_newton_iter,
-                       max_ls_steps = max_ls_steps)
+  gradient_line_search(
+    d0, A, alpha,
+    tol = tol,
+    max_iter = max_newton_iter,
+    max_ls_steps = max_ls_steps
+  )
 }
 
 #' @importFrom Matrix diag
 #' @importFrom rlang warn
-gradient_line_search <- function(d, A, alpha,
-                                 tol = 1e-4,
-                                 max_iter = 100,
-                                 max_ls_steps = 15) {
+gradient_line_search <- function(
+    d, A, alpha,
+    tol = 1e-4,
+    max_iter = 100,
+    max_ls_steps = 15) {
   iter <- 0
   prev_val <- -Inf
   Ad <- c(A %*% d)
@@ -87,7 +91,9 @@ gradient_line_search <- function(d, A, alpha,
 #' alpha <- 0.5
 #' f.d(d, A, alpha) # -24.3
 f_d <- function(d, Ad, alpha) {
-  if (any(d <= 0)) return(-Inf)
+  if (any(d <= 0)) {
+    return(-Inf)
+  }
   2 * (1 - alpha) * sum(log(d)) - sum(d * Ad)
 }
 

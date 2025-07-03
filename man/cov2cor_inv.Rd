@@ -26,20 +26,20 @@ Reconstruct covariance(s) from correlation(s) plus variances.
 \examples{
 # 2D example
 Sigma <- matrix(c(4, 1.2, 1.2, 9), 2, 2)
-C     <- cov2cor(Sigma)
+C <- cov2cor(Sigma)
 Sigma2 <- cov2cor_inv(C, diag(Sigma))
 all.equal(Sigma, Sigma2)
 
 # 3D example: two correlation matrices sharing the same variances
-C3 <- array(0, c(2,2,2))
-C3[,,1] <- diag(2)
-C3[,,2] <- cov2cor(Sigma)
+C3 <- array(0, c(2, 2, 2))
+C3[, , 1] <- diag(2)
+C3[, , 2] <- cov2cor(Sigma)
 S3 <- cov2cor_inv(C3, diag(Sigma))
-dim(S3)  # 2 2 2
+dim(S3) # 2 2 2
 
 # 3D with slice‐specific variances
-vars <- cbind(c(4,9), c(1,16))  # 2×2: first slice variances (4,9), second (1,16)
+vars <- cbind(c(4, 9), c(1, 16)) # 2×2: first slice variances (4,9), second (1,16)
 S4 <- cov2cor_inv(C3, vars)
-all(dim(S4)==c(2,2,2))
+all(dim(S4) == c(2, 2, 2))
 
 }

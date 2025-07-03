@@ -36,10 +36,10 @@ p <- 5
 M <- matrix(rnorm(p^2), p, p)
 Q <- (M + t(M)) / 2
 diag(Q) <- runif(p, 0, 2)
-Q[1, 3] <- Q[3, 1] <- 0  # enforce some zeros
+Q[1, 3] <- Q[3, 1] <- 0 # enforce some zeros
 Q <- (Q + t(Q)) / 2
 E <- Q + matrix(rnorm(p^2, 0, 0.1), p, p)
 E <- (E + t(E)) / 2
-E[2, 4] <- E[4, 2] <- 0     # drop one entry
+E[2, 4] <- E[4, 2] <- 0 # drop one entry
 compare_matrices(Q, E)
 }

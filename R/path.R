@@ -37,10 +37,10 @@
 #'
 #' @examples
 #' p <- 7
-#' R.true <- toeplitz(c(1, -0.5, rep(0, p-2)))
+#' R.true <- toeplitz(c(1, -0.5, rep(0, p - 2)))
 #' D.true <- sqrt(rchisq(p, df = 3))
 #' S <- solve(diag(D.true) %*% R.true %*% diag(D.true))
-#' alpha <- 4/20
+#' alpha <- 4 / 20
 #'
 #' # get a small path of 20 lambdas but stop when >40% edges
 #' resPath <- pcglassoPath(
@@ -71,12 +71,14 @@ pcglassoPath <- function(
     tol_D = 1e-4,
     max_iter_D_newton = 500,
     max_iter_D_ls = 100) {
-  stopifnot(is.matrix(S),
-            nrow(S) == ncol(S),
-            is.numeric(alpha),
-            is.null(lambdas) || is.numeric(lambdas),
-            min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
-            max_edge_fraction >= 0 && max_edge_fraction <= 1)
+  stopifnot(
+    is.matrix(S),
+    nrow(S) == ncol(S),
+    is.numeric(alpha),
+    is.null(lambdas) || is.numeric(lambdas),
+    min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
+    max_edge_fraction >= 0 && max_edge_fraction <= 1
+  )
 
   p <- nrow(S)
   if (is.null(R0_inv)) R0_inv <- solve(R0)
@@ -151,10 +153,10 @@ pcglassoPath <- function(
   names(outR) <- names(outD) <- names(outW) <- paste0("lam_", round(lambdas, 4))
   list(
     lambdas = lambdas,
-    R_path  = outR,
-    D_path  = outD,
-    W_path  = outW,
-    loss    = losses,
+    R_path = outR,
+    D_path = outD,
+    W_path = outW,
+    loss = losses,
     iters = iters
   )
 }
@@ -176,28 +178,30 @@ pcglassoPath <- function(
 #'                      $n_param
 #'                      $BIC_gamma the average BIC_gamma
 #' @export
-loss_path <- function(precision_array, Sigma, n, gamma=0.5){
-  if("list" %in% is(precision_array)){
+loss_path <- function(precision_array, Sigma, n, gamma = 0.5) {
+  if ("list" %in% is(precision_array)) {
     W <- precision_array$W_path
     precision_array <- simplify2array(W)
   }
   k <- dim(precision_array)[3]
   p <- dim(precision_array)[1]
-  loglik <- forbenious <- n_param <- BIC_gamma <- nEdges <-rep(0, k)
+  loglik <- forbenious <- n_param <- BIC_gamma <- nEdges <- rep(0, k)
 
-  for(i in 1:k){
-    P <- precision_array[,,i]
+  for (i in 1:k) {
+    P <- precision_array[, , i]
     L.P <- chol(P)
-    loglik[i] <- n*(sum(log(diag(L.P))) - 0.5 * sum(diag(P%*%Sigma)) - 0.5 * p * log(2 * pi))
-    forbenious[i] <- sum((solve(P)- Sigma)^2)
-    n_param[i] <- (p * p - sum(P==0) - p)/2 + p
-    nEdges[i] <- (sum(P!=0)-p)/2
-    BIC_gamma[i] <- -2 * loglik[i]  + nEdges[i] * (log(n) + 4 * gamma * log(p))
+    loglik[i] <- n * (sum(log(diag(L.P))) - 0.5 * sum(diag(P %*% Sigma)) - 0.5 * p * log(2 * pi))
+    forbenious[i] <- sum((solve(P) - Sigma)^2)
+    n_param[i] <- (p * p - sum(P == 0) - p) / 2 + p
+    nEdges[i] <- (sum(P != 0) - p) / 2
+    BIC_gamma[i] <- -2 * loglik[i] + nEdges[i] * (log(n) + 4 * gamma * log(p))
   }
 
-  return(list(loglik     = loglik,
-              forbenious = forbenious,
-              n_param    = n_param,
-              BIC_gamma = BIC_gamma,
-              nEdges = nEdges))
+  return(list(
+    loglik = loglik,
+    forbenious = forbenious,
+    n_param = n_param,
+    BIC_gamma = BIC_gamma,
+    nEdges = nEdges
+  ))
 }

@@ -71,7 +71,7 @@ until the maximum number of iterations is reached.
 }
 \examples{
 p <- 7
-R.true <- toeplitz(c(c(1, -0.5), rep(0, p-2)))
+R.true <- toeplitz(c(c(1, -0.5), rep(0, p - 2)))
 D.true <- sqrt(rchisq(p, 3))
 S_inv.true <- diag(D.true) \%*\% R.true \%*\% diag(D.true)
 
