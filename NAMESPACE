@@ -2,7 +2,7 @@
 
 export(compare_matrices)
 export(cov2cor_inv)
-export(loss.evaluation)
+export(loss_path)
 export(pcglassoFast)
 export(pcglassoPath)
 importFrom(Matrix,diag)
