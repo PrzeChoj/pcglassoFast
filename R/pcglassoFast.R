@@ -73,10 +73,10 @@ pcglassoFast <- function(
   while (!stop_loop & i < max.iter) {
     resD <- DOptim(
       A = R * S,
-      D0 = D,
+      d0 = D,
       tol = D.tol,
-      max.starting.iter = D.max.starting.iter,
-      max.outer.iter = D.max.outer.iter,
+      max_start_iter = D.max.starting.iter,
+      max_ls_steps = D.max.outer.iter,
       alpha = alpha
     )
     D <- resD$D

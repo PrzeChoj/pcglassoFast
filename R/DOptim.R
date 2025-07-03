@@ -1,56 +1,73 @@
-#' using diagonal approximation fo Hessian
-DOptim <- function(
-    A,
-    D0 = NULL,
-    tol = 1e-4,
-    max.starting.iter = 500,
-    max.outer.iter = 100,
-    alpha = 0) {
-  if (is.null(D0)) {s
-    D0 <- rep(1, ncol(A))
+## Refactored version of DOptim and helpers with minor readability improvements
+
+#' Diagonal Newton optimization for f(d)
+#'
+#' @param A symmetric matrix (p x p); A = R * S
+#' @param d0 initial vector (defaults to ones)
+#' @param tol convergence tolerance
+#' @param max_start_iter max outer Newton iterations
+#' @param max_ls_steps max line-search iterations
+#' @param alpha regularization parameter
+#' @return list with D, iterations, and final value
+DOptim <- function(A,
+                   d0 = NULL,
+                   tol = 1e-4,
+                   max_start_iter = 100,
+                   max_ls_steps = 15,
+                   alpha = 0) {
+  if (is.null(d0)) {
+    d0 <- rep(1, ncol(A))
   }
-  Res <- gradient.line.diagH.search(D0, A, alpha, tol = tol, max_iter = max.outer.iter, max_inner = 15)
-  return(Res)
+
+  gradient_line_search(d0, A, alpha,
+                       tol = tol,
+                       max_iter = max_start_iter,
+                       max_ls_steps = max_ls_steps)
 }
 
 #' @importFrom Matrix diag
-gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, max_inner = 15) {
+#' @importFrom rlang warn
+gradient_line_search <- function(d, A, alpha,
+                                 tol = 1e-4,
+                                 max_iter = 100,
+                                 max_ls_steps = 15) {
   iter <- 0
-  val.old <- -Inf
-  val <- f.d(d, A, alpha)
-  diag.A <- Matrix::diag(A)
-  inner_fail <- FALSE
-  while (val - val.old > tol && iter < max_iter && !inner_fail) {
-    val.old <- val
-    val.star <- -Inf
-    grad <- gradient.d(d, A, alpha)
-    H <- hessian.diag.d(d, diag.A, alpha)
-    if (any(H >= 0)) {
-      rlang::warn("Hessian should be negative definite. This should not occur. Please open issue to let us know.")
+  prev_val <- -Inf
+  Ad <- A %*% d
+  curr_val <- f_d(d, Ad, alpha)
+  diagA <- Matrix::diag(A)
+
+  while ((curr_val - prev_val) > tol && iter < max_iter) {
+    prev_val <- curr_val
+
+    g <- gradient_d(d, Ad, alpha)
+    H_diag <- -2 * (diagA + (1 - alpha) / (d^2))
+
+    step <- -g / (H_diag - 1e-8)
+
+    # Line Search
+    step_size <- 1
+    success <- FALSE
+    for (bt in seq_len(max_ls_steps)) {
+      d_new <- d + step_size * step
+      val_new <- f_d(d_new, A %*% d_new, alpha)
+      if (val_new >= prev_val) {
+        d <- d_new
+        curr_val <- val_new
+        success <- TRUE
+        break
+      }
+      step_size <- step_size * 0.5
     }
-    eps <- 1e-8
-    H.safe <- H - eps
-    H.inv.g <- -grad / H.safe
-    stepsize <- 1
-    inner.iter <- 0
-    while (val.star < val.old && inner.iter < max_inner) {
-      d.star <- d + stepsize * H.inv.g
-      val.star <- f.d(d.star, A, alpha)
-      inner.iter <- inner.iter + 1
-      stepsize <- stepsize * 0.5
-    }
-    if (val.star >= val.old) {
-      d <- d.star
-      val <- val.star
-    } else {
-      inner_fail <- TRUE
-      # Should not happen.
-      rlang::warn("Fail of the inner iteration of optimization process for diagonal. This should not occur. Please open issue to let us know.")
+    if (!success) {
+      rlang::warn("Line search failed to improve objective in D after ", max_ls_steps, " steps. This should not occur. Please open issue to let us know.")
+      break
     }
 
     iter <- iter + 1
   }
-  return(list(D = c(d), iter = iter, val = val))
+
+  list(D = d, iter = iter, val = curr_val)
 }
 
 #' Evaluate function value at d
@@ -69,12 +86,9 @@ gradient.line.diagH.search <- function(d, A, alpha, tol = 1e-4, max_iter = 100, 
 #' A <- matrix(c(1, 2, 2, 4), 2, 2)
 #' alpha <- 0.5
 #' f.d(d, A, alpha) # -24.3
-f.d <- function(d, A, alpha) {
-  if (any(d <= 0)) {
-    return(-Inf)
-  }
-
-  2 * (1 - alpha) * sum(log(d)) - sum(d * (A %*% d))
+f_d <- function(d, Ad, alpha) {
+  if (any(d <= 0)) return(-Inf)
+  2 * (1 - alpha) * sum(log(d)) - sum(d * Ad)
 }
 
 #' Compute the gradient of f at d
@@ -93,11 +107,6 @@ f.d <- function(d, A, alpha) {
 #' A <- matrix(c(1, 2, 2, 4), 2, 2)
 #' alpha <- 0.5
 #' gradient.d(d, A, alpha)
-gradient.d <- function(d, A, alpha) {
-  2 * ((1 - alpha) / d - A %*% d)
-}
-
-hessian.diag.d <- function(d, diag.A, alpha) {
-  H <- diag.A + (1 - alpha) / (d^2)
-  return(-2 * H)
+gradient_d <- function(d, Ad, alpha) {
+  2 * ((1 - alpha) / d - Ad)
 }

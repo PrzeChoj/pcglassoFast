@@ -2,17 +2,33 @@
 % Please edit documentation in R/DOptim.R
 \name{DOptim}
 \alias{DOptim}
-\title{using diagonal approximation fo Hessian}
+\title{Diagonal Newton optimization for f(d)}
 \usage{
 DOptim(
   A,
-  D0 = NULL,
+  d0 = NULL,
   tol = 1e-04,
-  max.starting.iter = 500,
-  max.outer.iter = 100,
+  max_start_iter = 100,
+  max_ls_steps = 15,
   alpha = 0
 )
 }
+\arguments{
+\item{A}{symmetric matrix (p x p); A = R * S}
+
+\item{d0}{initial vector (defaults to ones)}
+
+\item{tol}{convergence tolerance}
+
+\item{max_start_iter}{max outer Newton iterations}
+
+\item{max_ls_steps}{max line-search iterations}
+
+\item{alpha}{regularization parameter}
+}
+\value{
+list with D, iterations, and final value
+}
 \description{
-using diagonal approximation fo Hessian
+Diagonal Newton optimization for f(d)
 }
