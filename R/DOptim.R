@@ -6,63 +6,11 @@ DOptim <- function(
     max.starting.iter = 500,
     max.outer.iter = 100,
     alpha = 0) {
-  if (is.null(D0)) {
-    #D0 <- get_good_starting_point(A, max.starting.iter)
+  if (is.null(D0)) {s
     D0 <- rep(1, ncol(A))
   }
   Res <- gradient.line.diagH.search(D0, A, alpha, tol = tol, max_iter = max.outer.iter, max_inner = 15)
   return(Res)
-}
-
-
-# TODO: Check, maybe the previous optimal D would be
-# a better starting point for this algorithm than e.
-#' @importFrom rlang warn
-get_good_starting_point <- function(A, max_iter = 100) {
-  myNorm <- function(A, x) {
-    e <- rep(1, ncol(A))
-    norm(diag(x) %*% A %*% diag(x) %*% e - e, type = "2")
-  }
-
-  n <- ncol(A)
-  e <- rep(1, n)
-  if (myNorm(A, e) < 1) {
-    return(as.vector(e))
-  }
-  if (myNorm(A, 1 / diag(A)) < 1) {
-    return(as.vector(1 / diag(A)))
-  }
-
-  iter <- 0
-  b <- e - A %*% e
-  t0 <- 1
-  x0 <- e
-
-  x0 <- x0 + newton(A, x0, b, t0)
-  hatx <- sqrt(t0) * x0
-
-  while (myNorm(A, hatx) >= 1 && iter < max_iter) {
-    t0 <- t0 * (1 - 1 / (4 * sqrt(n) + 1))
-    x0 <- x0 + newton(A, x0, b, t0)
-
-    hatx <- sqrt(t0) * x0
-    iter <- iter + 1
-  }
-
-  if (iter == max_iter) {
-    # Meybe the error here would be better, but in my tests this does not work so bad as the theory suggests
-    rlang::warn("no good_starting_point found")
-  }
-
-  as.vector(hatx)
-}
-
-newton <- function(A, x0, b = 0, t0 = 1) {
-  rhs <- 1 / x0 - t0 * A %*% x0 - t0 * b
-  lhs <- diag(x0^(-2)) + t0 * A
-  y <- backsolve(lhs, rhs)
-
-  as.vector(y)
 }
 
 #' @importFrom Matrix diag
