@@ -21,6 +21,10 @@ ROptim <- function(
     maxItLasso = max_inner_iter, start = "warm", w.init = Rinv, wi.init = R
   )
 
+  if (ans$niter == max_outer_iter + 1) {
+    rlang::warn("Optimization of R matrix reached the max number of iterations. Consider increasing the `max_iter_R_outer` parameter in `pcglassoFast()` function.")
+  }
+
   list(
     R           = ans$wi,
     Rinv        = ans$w,

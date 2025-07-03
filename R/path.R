@@ -178,7 +178,7 @@ pcglassoPath <- function(
 #'                      $n_param
 #'                      $BIC_gamma the average BIC_gamma
 #' @export
-loss_path <- function(precision_array, Sigma, n, gamma = 0.5) {
+evaluate_loss_path <- function(precision_array, Sigma, n, gamma = 0.5) {
   if ("list" %in% is(precision_array)) {
     W <- precision_array$W_path
     precision_array <- simplify2array(W)
