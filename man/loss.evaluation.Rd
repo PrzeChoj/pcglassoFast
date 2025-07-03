@@ -4,10 +4,10 @@
 \alias{loss.evaluation}
 \title{Loss evaluation}
 \usage{
-loss.evaluation(Precision.array, Sigma, n, gamma = 0.5)
+loss.evaluation(precision_array, Sigma, n, gamma = 0.5)
 }
 \arguments{
-\item{Precision.array}{(p x p x k)}
+\item{precision_array}{(p x p x k)}
 
 \item{Sigma}{(p x p) the covariance matrix}
 
@@ -18,7 +18,7 @@ loss.evaluation(Precision.array, Sigma, n, gamma = 0.5)
 \value{
 list (k x 1) $loglik the average loglikelihood
                      $forbenious
-                     $n.param
+                     $n_param
                      $BIC_gamma the average BIC_gamma
 }
 \description{

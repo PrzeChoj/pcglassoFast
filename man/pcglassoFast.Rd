@@ -11,7 +11,7 @@ pcglassoFast(
   R = diag(dim(S)[1]),
   R_inv = solve(R),
   D = rep(1, dim(S)[1]),
-  max.iter = 100,
+  max_iter = 100,
   tolerance = 1e-06,
   tol_R_inner = 0.01,
   tol_R_outer = 0.001,
@@ -38,7 +38,7 @@ precision matrix (it is recommended to left it default).}
 \item{D}{(vector of length p) diagonal of initial estimation of diagonal
 matrix (it is recommended to left it default).}
 
-\item{max.iter}{(integer) maximum number of iterations.}
+\item{max_iter}{(integer) maximum number of iterations.}
 
 \item{tolerance}{(double) tolerance for convergence.}
 
@@ -79,7 +79,7 @@ S <- solve(S_inv.true) # data
 
 alpha <- 4 / 20 # 4 / n, as in Carter's paper
 
-pcglassoFast(S, 0.11, alpha, max.iter = 15)
+pcglassoFast(S, 0.11, alpha, max_iter = 15)
 }
 \seealso{
 \code{\link[=pcglassoPath]{pcglassoPath()}} to compute a full λ‑path of solutions

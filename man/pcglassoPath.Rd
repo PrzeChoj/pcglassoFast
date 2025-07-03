@@ -9,20 +9,20 @@ pcglassoPath(
   alpha,
   lambdas = NULL,
   nlambda = 50,
-  lambda.min.ratio = 0.01,
-  max.edge.fraction = 1,
+  min_lambda_ratio = 0.01,
+  max_edge_fraction = 1,
   R0 = diag(nrow(S)),
-  R0_inv = NULL,
+  R0_inv = solve(R0),
   D0 = rep(1, nrow(S)),
-  max.iter = 100,
+  max_iter = 100,
   tolerance = 1e-06,
-  R.tol.inner = 0.01,
-  R.tol.outer = 0.001,
-  R.max.inner.iter = 10,
-  R.max.outer.iter = 100,
-  D.tol = 1e-04,
-  D.max.starting.iter = 500,
-  D.max.outer.iter = 100
+  tol_R_inner = 0.01,
+  tol_R_outer = 0.001,
+  max_iter_R_inner = 10,
+  max_iter_R_outer = 100,
+  tol_D = 1e-04,
+  max_iter_D_newton = 500,
+  max_iter_D_ls = 100
 )
 }
 \arguments{
@@ -31,13 +31,13 @@ pcglassoPath(
 \item{alpha}{(double, \eqn{\alpha \in \mathbb{R}}) on‑diagonal penalty parameter.}
 
 \item{lambdas}{(numeric vector) sequence of lambda values to fit. If \code{NULL}, an exponentially spaced grid of length \code{nlambda} from
-\eqn{\max_{i≠j}|S_{ij}|} down to \code{lambda.min.ratio * lambda_max} is generated.}
+\eqn{\max_{i≠j}|S_{ij}|} down to \code{min_lambda_ratio * lambda_max} is generated.}
 
 \item{nlambda}{(integer) number of lambda values when \code{lambdas = NULL}.}
 
-\item{lambda.min.ratio}{(double) ratio \eqn{\lambda_{\min}/\lambda_{\max}} used to build the grid.}
+\item{min_lambda_ratio}{(double) ratio \eqn{\lambda_{\min}/\lambda_{\max}} used to build the grid.}
 
-\item{max.edge.fraction}{(double in (0,1]) maximum allowed fraction of
+\item{max_edge_fraction}{(double in (0,1]) maximum allowed fraction of
 nonzero off‑diagonal entries ("edges") in the graph.  Once this is exceeded,
 the lambda‑path search stops early.}
 
@@ -45,7 +45,7 @@ the lambda‑path search stops early.}
 
 \item{D0}{(numeric vector of length p) initial diagonal entries; default is \code{rep(1,p)}.}
 
-\item{max.iter, tolerance, R.tol.inner, R.tol.outer, R.max.inner.iter, R.max.outer.iter, D.tol, D.max.starting.iter, D.max.outer.iter}{Parameters passed to \code{\link[=pcglassoFast]{pcglassoFast()}} for each \code{lambda}.}
+\item{max_iter, tolerance, tol_R_inner, tol_R_outer, max_iter_R_inner, max_iter_R_outer, tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=pcglassoFast]{pcglassoFast()}} for each \code{lambda}.}
 }
 \value{
 A list with components:
@@ -65,7 +65,7 @@ This function computes the entire regularization path of the PC‑GLASSO estimat
 \code{\link{pcglassoFast}()} at each value of \eqn{\lambda} in \code{lambdas}, warm‑starting
 from the previous solution.  You get back a list of \eqn{(R,D)} pairs (and the resulting
 covariance \eqn{W = D\,R\,D}) as \eqn{\lambda} decreases, stopping early if the
-graph density exceeds \code{max.edge.fraction}.
+graph density exceeds \code{max_edge_fraction}.
 }
 \examples{
 p <- 7
@@ -78,8 +78,8 @@ alpha <- 4/20
 resPath <- pcglassoPath(
   S, alpha,
   nlambda = 20,
-  lambda.min.ratio = 0.05,
-  max.edge.fraction = 0.4
+  min_lambda_ratio = 0.05,
+  max_edge_fraction = 0.4
 )
 resPath
 }

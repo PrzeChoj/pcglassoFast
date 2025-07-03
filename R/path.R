@@ -3,15 +3,15 @@
 #' @param S (p × p matrix) empirical covariance matrix derived from the data.
 #' @param alpha (double, \eqn{\alpha \in \mathbb{R}}) on‑diagonal penalty parameter.
 #' @param lambdas (numeric vector) sequence of lambda values to fit. If \code{NULL}, an exponentially spaced grid of length \code{nlambda} from
-#'   \eqn{\max_{i≠j}|S_{ij}|} down to \code{lambda.min.ratio * lambda_max} is generated.
+#'   \eqn{\max_{i≠j}|S_{ij}|} down to \code{min_lambda_ratio * lambda_max} is generated.
 #' @param nlambda (integer) number of lambda values when \code{lambdas = NULL}.
-#' @param lambda.min.ratio (double) ratio \eqn{\lambda_{\min}/\lambda_{\max}} used to build the grid.
-#' @param max.edge.fraction (double in (0,1]) maximum allowed fraction of
+#' @param min_lambda_ratio (double) ratio \eqn{\lambda_{\min}/\lambda_{\max}} used to build the grid.
+#' @param max_edge_fraction (double in (0,1]) maximum allowed fraction of
 #'   nonzero off‑diagonal entries ("edges") in the graph.  Once this is exceeded,
 #'   the lambda‑path search stops early.
 #' @param R0,R0_inv (p × p matrices) initial precision matrix and its inverse; defaults to \code{diag(p)}.
 #' @param D0 (numeric vector of length p) initial diagonal entries; default is \code{rep(1,p)}.
-#' @param max.iter,tolerance,R.tol.inner,R.tol.outer,R.max.inner.iter,R.max.outer.iter,D.tol,D.max.starting.iter,D.max.outer.iter
+#' @param max_iter,tolerance,tol_R_inner,tol_R_outer,max_iter_R_inner,max_iter_R_outer,tol_D,max_iter_D_newton,max_iter_D_ls
 #'         Parameters passed to [pcglassoFast()] for each \code{lambda}.
 #'
 #' @details
@@ -19,7 +19,7 @@
 #' \code{\link{pcglassoFast}()} at each value of \eqn{\lambda} in \code{lambdas}, warm‑starting
 #' from the previous solution.  You get back a list of \eqn{(R,D)} pairs (and the resulting
 #' covariance \eqn{W = D\,R\,D}) as \eqn{\lambda} decreases, stopping early if the
-#' graph density exceeds \code{max.edge.fraction}.
+#' graph density exceeds \code{max_edge_fraction}.
 #'
 #' @md
 #'
@@ -46,8 +46,8 @@
 #' resPath <- pcglassoPath(
 #'   S, alpha,
 #'   nlambda = 20,
-#'   lambda.min.ratio = 0.05,
-#'   max.edge.fraction = 0.4
+#'   min_lambda_ratio = 0.05,
+#'   max_edge_fraction = 0.4
 #' )
 #' resPath
 pcglassoPath <- function(
@@ -55,45 +55,50 @@ pcglassoPath <- function(
     alpha,
     lambdas = NULL,
     nlambda = 50,
-    lambda.min.ratio = 0.01,
-    max.edge.fraction = 1.0,
+    min_lambda_ratio = 0.01,
+    max_edge_fraction = 1.0,
     # initial R, D (at the largest lambda)
     R0 = diag(nrow(S)),
-    R0_inv = NULL,
+    R0_inv = solve(R0),
     D0 = rep(1, nrow(S)),
-    # controls passed **through** to pcglassoFast
-    max.iter = 100,
+    # controls passed to pcglassoFast
+    max_iter = 100,
     tolerance = 1e-6,
-    R.tol.inner = 1e-2,
-    R.tol.outer = 1e-3,
-    R.max.inner.iter = 10,
-    R.max.outer.iter = 100,
-    D.tol = 1e-4,
-    D.max.starting.iter = 500,
-    D.max.outer.iter = 100) {
+    tol_R_inner = 1e-2,
+    tol_R_outer = 1e-3,
+    max_iter_R_inner = 10,
+    max_iter_R_outer = 100,
+    tol_D = 1e-4,
+    max_iter_D_newton = 500,
+    max_iter_D_ls = 100) {
+  stopifnot(is.matrix(S),
+            nrow(S) == ncol(S),
+            is.numeric(alpha),
+            is.null(lambdas) || is.numeric(lambdas),
+            min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
+            max_edge_fraction >= 0 && max_edge_fraction <= 1)
+
   p <- nrow(S)
   if (is.null(R0_inv)) R0_inv <- solve(R0)
 
   # build lambda‐grid if needed
   if (is.null(lambdas)) {
     lam_max <- max(abs(S - diag(diag(S))))
-    lam_min <- lambda.min.ratio * lam_max
+    lam_min <- min_lambda_ratio * lam_max
     lambdas <- exp(seq(log(lam_max), log(lam_min), length.out = nlambda))
   }
 
   # prepare storage
-  outR <- vector("list", length(lambdas))
-  outD <- vector("list", length(lambdas))
-  outW <- vector("list", length(lambdas))
-  iters <- vector("numeric", length(lambdas))
-  losses <- numeric(length(lambdas))
+  K <- length(lambdas)
+  outW <- outD <- outR <- vector("list", K)
+  losses <- iters <- numeric(K)
 
   # warm start
   R_curr <- R0
   Rinv_curr <- R0_inv
   D_curr <- D0
 
-  for (k in seq_along(lambdas)) {
+  for (k in 1:K) {
     lambda_k <- lambdas[k]
 
     # run full blockwise optimization at this lambda
@@ -104,15 +109,15 @@ pcglassoPath <- function(
       R = R_curr,
       R_inv = Rinv_curr,
       D = D_curr,
-      max.iter = max.iter,
+      max_iter = max_iter,
       tolerance = tolerance,
-      R.tol.inner = R.tol.inner,
-      R.tol.outer = R.tol.outer,
-      R.max.inner.iter = R.max.inner.iter,
-      R.max.outer.iter = R.max.outer.iter,
-      D.tol = D.tol,
-      D.max.starting.iter = D.max.starting.iter,
-      D.max.outer.iter = D.max.outer.iter
+      tol_R_inner = tol_R_inner,
+      tol_R_outer = tol_R_outer,
+      max_iter_R_inner = max_iter_R_inner,
+      max_iter_R_outer = max_iter_R_outer,
+      tol_D = tol_D,
+      max_iter_D_newton = max_iter_D_newton,
+      max_iter_D_ls = max_iter_D_ls
     )
 
     # extract
@@ -123,26 +128,25 @@ pcglassoPath <- function(
     # record
     outR[[k]] <- R_curr
     outD[[k]] <- D_curr
-    outW[[k]] <- diag(D_curr) %*% R_curr %*% diag(D_curr)
+    outW[[k]] <- R_curr * (D_curr %o% D_curr)
     iters[k] <- fit$n_iters
     losses[k] <- tail(fit$loss, 1)
 
     # compute edge fraction and early stop
-    off_nz <- sum(R_curr != 0) - p
-    edge_frac <- off_nz / (p * (p - 1))
-    if (edge_frac > max.edge.fraction) {
+    edge_frac <- (sum(R_curr != 0) - p) / (p * (p - 1))
+    if (edge_frac > max_edge_fraction) {
       break
     }
   }
 
   # trim to actual length
-  n_used <- k
-  lambdas <- lambdas[1:n_used]
-  outR <- outR[1:n_used]
-  outD <- outD[1:n_used]
-  outW <- outW[1:n_used]
-  losses <- losses[1:n_used]
-  iters <- iters[1:n_used]
+  used <- 1:k
+  lambdas <- lambdas[used]
+  outR <- outR[used]
+  outD <- outD[used]
+  outW <- outW[used]
+  losses <- losses[used]
+  iters <- iters[used]
 
   names(outR) <- names(outD) <- names(outW) <- paste0("lam_", round(lambdas, 4))
   list(
@@ -163,38 +167,37 @@ pcglassoPath <- function(
 #' matrices
 #' the BIC_gamma is from Extended Bayesian Information Criteria for Gaussian
 #' Graphical Models
-#' @param Precision.array (p x p x k)
+#' @param precision_array (p x p x k)
 #' @param Sigma (p x p) the covariance matrix
 #' @param n     (int)   number of observations
 #' @param gamma (1 x 1) scaling parameter for \eqn{BIC_{gamma}}
 #' @return list (k x 1) $loglik the average loglikelihood
 #'                      $forbenious
-#'                      $n.param
+#'                      $n_param
 #'                      $BIC_gamma the average BIC_gamma
-#'@export
-loss.evaluation <- function(Precision.array, Sigma,n ,gamma=0.5){
-
-  if("list"%in%is(Precision.array)){
-    W <- Precision.array$W_path
-    Precision.array <- simplify2array(W)
+#' @export
+loss.evaluation <- function(precision_array, Sigma, n, gamma=0.5){
+  if("list" %in% is(precision_array)){
+    W <- precision_array$W_path
+    precision_array <- simplify2array(W)
   }
-  k <- dim(Precision.array)[3]
-  p <- dim(Precision.array)[1]
-  loglik <- forbenious <- n.param <- BIC_gamma <- nEdges <-rep(0,k)
+  k <- dim(precision_array)[3]
+  p <- dim(precision_array)[1]
+  loglik <- forbenious <- n_param <- BIC_gamma <- nEdges <-rep(0, k)
 
   for(i in 1:k){
-    P <- Precision.array[,,i]
+    P <- precision_array[,,i]
     L.P <- chol(P)
     loglik[i] <- n*(sum(log(diag(L.P))) - 0.5 * sum(diag(P%*%Sigma)) - 0.5 * p * log(2 * pi))
     forbenious[i] <- sum((solve(P)- Sigma)^2)
-    n.param[i] <- (p * p - sum(P==0) - p)/2 + p
+    n_param[i] <- (p * p - sum(P==0) - p)/2 + p
     nEdges[i] <- (sum(P!=0)-p)/2
     BIC_gamma[i] <- -2 * loglik[i]  + nEdges[i] * (log(n) + 4 * gamma * log(p))
   }
 
   return(list(loglik     = loglik,
               forbenious = forbenious,
-              n.param    = n.param,
+              n_param    = n_param,
               BIC_gamma = BIC_gamma,
               nEdges = nEdges))
 }
