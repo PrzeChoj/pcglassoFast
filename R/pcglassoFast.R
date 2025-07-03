@@ -75,7 +75,7 @@ pcglassoFast <- function(
       A = R * S,
       d0 = D,
       tol = D.tol,
-      max_start_iter = D.max.starting.iter,
+      max_newton_iter = D.max.starting.iter,
       max_ls_steps = D.max.outer.iter,
       alpha = alpha
     )
@@ -91,10 +91,10 @@ pcglassoFast <- function(
       R = R,
       Rinv = R_inv,
       lambda = lambda,
-      tol.inner = R.tol.inner,
-      tol.outer = R.tol.outer,
-      max.inner.iter = R.max.inner.iter,
-      max.outer.iter = R.max.outer.iter
+      tol_inner = R.tol.inner,
+      tol_outer = R.tol.outer,
+      max_inner_iter = R.max.inner.iter,
+      max_outer_iter = R.max.outer.iter
     )
     R <- resR$R
     R_inv <- resR$Rinv

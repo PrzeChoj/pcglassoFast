@@ -5,14 +5,14 @@
 #' @param A symmetric matrix (p x p); A = R * S
 #' @param d0 initial vector (defaults to ones)
 #' @param tol convergence tolerance
-#' @param max_start_iter max outer Newton iterations
+#' @param max_newton_iter max outer Newton iterations
 #' @param max_ls_steps max line-search iterations
 #' @param alpha regularization parameter
 #' @return list with D, iterations, and final value
 DOptim <- function(A,
                    d0 = NULL,
                    tol = 1e-4,
-                   max_start_iter = 100,
+                   max_newton_iter = 100,
                    max_ls_steps = 15,
                    alpha = 0) {
   if (is.null(d0)) {
@@ -21,7 +21,7 @@ DOptim <- function(A,
 
   gradient_line_search(d0, A, alpha,
                        tol = tol,
-                       max_iter = max_start_iter,
+                       max_iter = max_newton_iter,
                        max_ls_steps = max_ls_steps)
 }
 
@@ -33,7 +33,7 @@ gradient_line_search <- function(d, A, alpha,
                                  max_ls_steps = 15) {
   iter <- 0
   prev_val <- -Inf
-  Ad <- A %*% d
+  Ad <- c(A %*% d)
   curr_val <- f_d(d, Ad, alpha)
   diagA <- Matrix::diag(A)
 

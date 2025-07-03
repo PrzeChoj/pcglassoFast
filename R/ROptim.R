@@ -3,29 +3,29 @@ ROptim <- function(
     R,
     Rinv,
     lambda,
-    tol.inner = 1e-4,
-    tol.outer = 1e-4,
-    max.inner.iter = 10,
-    max.outer.iter = 100) {
+    tol_inner = 1e-4,
+    tol_outer = 1e-4,
+    max_inner_iter = 10,
+    max_outer_iter = 100) {
   if (is.null(Rinv)) {
     Rinv <- solve(R)
   }
 
-  # TODO: tol.inner
+  # TODO: tol_inner
 
   p <- dim(R)[1]
-  lambda_matrix <- (matrix(rep(1, p * p), ncol = p) - diag(p)) * lambda
+  lambda_matrix <- matrix(lambda, p, p); diag(lambda_matrix) <- 0
   ans <- ROptim_to_fortran(
-    S, rho = lambda_matrix, thr = tol.outer, maxIt = max.outer.iter,
-    maxItLasso = max.inner.iter, start = "warm", w.init = Rinv, wi.init = R
+    S, rho = lambda_matrix, thr = tol_outer, maxIt = max_outer_iter,
+    maxItLasso = max_inner_iter, start = "warm", w.init = Rinv, wi.init = R
   )
 
-  R <- ans$wi
-  Rinv <- ans$w
-  outer.count <- ans$niter
-  loglik <- NA
-
-  return(list(R = R, Rinv = Rinv, outer.count = outer.count, loglik = loglik))
+  list(
+    R           = ans$wi,
+    Rinv        = ans$w,
+    outer.count = ans$niter,
+    loglik      = NA
+  )
 }
 
 
@@ -67,19 +67,18 @@ ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, maxItLasso = 50
   }
 
   # cold or warm start
-  start.type <- match.arg(start)
-  if (start.type == "cold") {
-    is <- 0
-    W <- X <- matrix(0, nrow = n, ncol = n)
-  }
-  if (start.type == "warm") {
-    is <- 1
-    if (is.null(w.init) | is.null(wi.init)) {
-      stop("Warm start specified: w.init and wi.init must be non-null")
-    }
-    W <- w.init
-    X <- wi.init
-  }
+  switch(
+    match.arg(start),
+    cold = {
+      is_flag <- 0
+      W <- X <- matrix(0, n, n)
+    },
+    warm = {
+      is_flag <- 1
+      if (is.null(w.init) || is.null(wi.init))
+        stop("Warm start specified: w.init and wi.init must be non-null")
+      W <- w.init; X <- wi.init
+  })
 
   Wd <- WXj <- numeric(n)
 
@@ -92,7 +91,7 @@ ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, maxItLasso = 50
   mode(maxIt) <- "integer"
   mode(maxItLasso) <- "integer"
   mode(msg) <- "integer"
-  mode(is) <- "integer"
+  mode(is_flag) <- "integer"
   mode(X) <- "double"
   mode(W) <- "double"
   mode(info) <- "integer"
@@ -106,7 +105,7 @@ ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, maxItLasso = 50
     maxIt,
     maxItLasso,
     msg,
-    is,
+    is_flag,
     X,
     W,
     Wd,

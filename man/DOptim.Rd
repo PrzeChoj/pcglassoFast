@@ -8,7 +8,7 @@ DOptim(
   A,
   d0 = NULL,
   tol = 1e-04,
-  max_start_iter = 100,
+  max_newton_iter = 100,
   max_ls_steps = 15,
   alpha = 0
 )
@@ -20,7 +20,7 @@ DOptim(
 
 \item{tol}{convergence tolerance}
 
-\item{max_start_iter}{max outer Newton iterations}
+\item{max_newton_iter}{max outer Newton iterations}
 
 \item{max_ls_steps}{max line-search iterations}
 
