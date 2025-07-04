@@ -23,6 +23,10 @@ ROptim <- function(
 
   if (ans$niter == max_outer_iter + 1) {
     rlang::warn(paste0("Optimization of R matrix reached the max number of iterations (", max_outer_iter, "). Consider increasing the `max_iter_R_outer` parameter in `pcglassoFast()` function."))
+    # sanity check:
+    if (max(abs((ans$w %*% ans$wi) - diag(nrow(ans$w)))) > 0.1) {
+      rlang::abort("Optimization of R matrix failed. Consider increasing the `max_iter_R_outer` and `max_iter_R_inner` parameters in `pcglassoFast()` function.")
+    }
   }
 
   list(
