@@ -72,7 +72,7 @@ gradient_line_search <- function(
   }
 
   if (iter == max_iter) {
-    rlang::warn("Optimization of diagonal D reached the max number of iterations. Consider increasing the `max_iter_D_newton` parameter in `pcglassoFast()` function.")
+    rlang::warn(paste0("Optimization of diagonal D reached the max number of iterations (", max_iter, "). Consider increasing the `max_iter_D_newton` parameter in `pcglassoFast()` function."))
   }
 
   list(D = d, iter = iter, val = curr_val)
