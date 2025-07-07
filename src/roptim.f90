@@ -151,6 +151,7 @@ do iter = 1,maxIt
       dw = max(dw, sum(abs(WXj(1:n) - W(:,j))))
       W(:,j) = WXj(1:n)
       W(j,:) = WXj(1:n)
+      dw = max(dw, abs(W(j,j) - (1 + sum(X(:,j)*W(:,j)))))
       W(j,j) = 1 + sum(X(:,j)*W(:,j))
    enddo
    if (dw .le. shr) then

@@ -83,7 +83,7 @@ pcglassoFast <- function(
     loss_D[i + 1] <- function_to_optimize(R, D, S, lambda, alpha)
 
     if (loss_D[i + 1] <= loss_R[i] - (tol_D * 2)) {
-      rlang::warn("This should not occur. Please open issue to let us know.")
+      rlang::warn("D optimization decreased the goal. This should not occur. Please open issue to let us know.")
     }
 
     resR <- ROptim(
@@ -103,7 +103,7 @@ pcglassoFast <- function(
     loss_R[i + 1] <- loss_new
 
     if (loss_R[i + 1] <= loss_D[i + 1] - (tol_R_outer * 2)) {
-      rlang::warn("This should not occur. Please open issue to let us know.")
+      rlang::warn("R optimization decreased the goal. This should not occur. Please open issue to let us know.")
     }
 
     i <- i + 1
