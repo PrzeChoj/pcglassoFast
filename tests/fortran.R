@@ -6,7 +6,9 @@ sign_fortran <- function(b, a) {
   if (a >= 0) abs(b) else -abs(b)
 }
 
-roptim_fortran_in_R <- function(n, S, L, thr, maxIt, maxItLasso, msg, warm, X, W) {
+roptim_fortran_in_R <- function(
+    n, S, L, thr, maxIt, maxItLasso, msg, warm, X, W
+  ) {
   Wd  <- numeric(n)
   WXj <- numeric(n)
 
@@ -96,6 +98,39 @@ roptim_fortran_in_R <- function(n, S, L, thr, maxIt, maxItLasso, msg, warm, X, W
   )
 }
 
+ROptim_in_R <- function(
+    S,
+    R,
+    Rinv,
+    lambda,
+    tol_inner = 1e-4,
+    tol_outer = 1e-4,
+    max_inner_iter = 10,
+    max_outer_iter = 100) {
+  if (is.null(Rinv)) {
+    Rinv <- solve(R)
+  }
+
+  p <- dim(R)[1]
+  lambda_matrix <- matrix(lambda, p, p); diag(lambda_matrix) <- 0
+  ans <- roptim_fortran_in_R(
+    n = p, S = S, L = lambda_matrix,
+    thr = tol_outer, maxIt = max_outer_iter, maxItLasso = max_inner_iter,
+    msg = 0, warm = 1, X = Rinv, W = R
+  )
+
+  if (ans$iterations == max_outer_iter + 1) {
+    rlang::warn(paste0("Optimization of R matrix reached the max number of iterations (", max_outer_iter, "). Consider increasing the `max_iter_R_outer` parameter in `pcglassoFast()` function."))
+  }
+
+  list(
+    R           = ans$X,
+    Rinv        = ans$W,
+    outer.count = ans$iterations,
+    loglik      = NA
+  )
+}
+
 
 #####
 # Test of the code:
@@ -121,7 +156,7 @@ roptim_fortran_in_R <- function(n, S, L, thr, maxIt, maxItLasso, msg, warm, X, W
 # fortran_ans <- ROptim_to_fortran(
 #   S = S, lambda,
 #   thr = 1.0e-4, maxIt = 120, maxItLasso = 500,
-#   start = "warm", w.init = R, wi.init = R_inv
+#   start = "warm", R_init = R, Rinv_init = R_inv
 # )
 # Fortran_time <- Sys.time() - Fortran_time
 #
