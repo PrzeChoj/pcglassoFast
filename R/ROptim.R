@@ -18,7 +18,7 @@ ROptim <- function(
   ans <- ROptim_to_fortran(
     S,
     rho = lambda_matrix, thr = tol_outer, maxIt = max_outer_iter,
-    maxItLasso = max_inner_iter, start = "warm", w.init = Rinv, wi.init = R
+    maxItLasso = max_inner_iter, start = "warm", Rinv_init = Rinv, R_init = R
   )
 
   if (ans$niter == max_outer_iter + 1) {
@@ -47,8 +47,8 @@ ROptim <- function(
 #' @param thr Threshold for convergence. Default is 1e-4.
 #' @param maxIt Maximum number of iterations. Default is 10,000.
 #' @param start Type of start: \code{"cold"} or \code{"warm"}.
-#' @param w.init Optional starting values for the estimated covariance matrix (p x p). Used only for warm starts.
-#' @param wi.init Optional starting values for the inverse covariance matrix (p x p). Used only for warm starts.
+#' @param Rinv_init Optional starting values for the estimated covariance matrix (p x p). Used only for warm starts.
+#' @param R_init Optional starting values for the inverse covariance matrix (p x p). Used only for warm starts.
 #' @param trace Logical. If \code{TRUE}, prints iteration info.
 #'
 #' @noRd
@@ -62,7 +62,7 @@ ROptim <- function(
 #' }
 #'
 #' @keywords glasso covariance matrix regularization penalized likelihood
-ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, maxItLasso = 500, start = c("cold", "warm"), w.init = NULL, wi.init = NULL, trace = FALSE) {
+ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, maxItLasso = 500, start = c("cold", "warm"), Rinv_init = NULL, R_init = NULL, trace = FALSE) {
   n <- nrow(S) # dimension of S
   if (is.matrix(rho)) {
     if (length(rho) != n * n) stop("The input matrix for \"rho\" must be of size ", n, " by ", n)
@@ -79,11 +79,11 @@ ROptim_to_fortran <- function(S, rho, thr = 1.0e-4, maxIt = 1e4, maxItLasso = 50
     },
     warm = {
       is_flag <- 1
-      if (is.null(w.init) || is.null(wi.init)) {
-        stop("Warm start specified: w.init and wi.init must be non-null")
+      if (is.null(Rinv_init) || is.null(R_init)) {
+        stop("Warm start specified: Rinv_init and R_init must be non-null")
       }
-      W <- w.init
-      X <- wi.init
+      W <- Rinv_init
+      X <- R_init
     }
   )
 

@@ -52,7 +52,7 @@ pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
     max_iter = 100, tolerance = 1e-6,
-    tol_R_inner = 1e-2, tol_R_outer = 1e-3,
+    tol_R_inner = 1e-2, tol_R_outer = 1e-4,
     max_iter_R_inner = 10, max_iter_R_outer = 100,
     tol_D = 1e-4,
     max_iter_D_newton = 500, max_iter_D_ls = 100) {
@@ -60,7 +60,8 @@ pcglassoFast <- function(
     is.matrix(S), nrow(S) == ncol(S),
     is.numeric(lambda), lambda >= 0,
     is.numeric(alpha),
-    max_iter >= 1, tolerance > 0
+    max_iter >= 1, tolerance > 0,
+    is.matrix(R), is.matrix(R_inv)
   )
 
   stop_loop <- FALSE
@@ -83,7 +84,7 @@ pcglassoFast <- function(
     loss_D[i + 1] <- function_to_optimize(R, D, S, lambda, alpha)
 
     if (loss_D[i + 1] <= loss_R[i] - (tol_D * 2)) {
-      rlang::warn("D optimization decreased the goal. This should not occur. Please open issue to let us know.")
+      rlang::warn("D optimization decreased the goal. This should not occur. We recommend to decrease the `tol_D` parameter.")
     }
 
     resR <- ROptim(
@@ -103,7 +104,7 @@ pcglassoFast <- function(
     loss_R[i + 1] <- loss_new
 
     if (loss_R[i + 1] <= loss_D[i + 1] - (tol_R_outer * 2)) {
-      rlang::warn("R optimization decreased the goal. This should not occur. Please open issue to let us know.")
+      rlang::warn("R optimization decreased the goal. This should not occur. We recommend to decrease the `tol_R_outer` parameter.")
     }
 
     i <- i + 1
