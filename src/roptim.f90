@@ -13,6 +13,8 @@
 !
 !  TODO(Our comment)
 !
+!  TODO(Ensure X is positive-definite when maxIt is reached)
+!
 !  This subroutine computes the L1 regularized covariance matrix estimate
 !  using the algorithm described in the paper:
 !    J. Friedman, T. Hastie, R. Tibshirani:
