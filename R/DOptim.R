@@ -37,14 +37,13 @@ gradient_line_search <- function(
     max_ls_steps = 15) {
   iter <- 0
   prev_val <- -Inf
-  Ad <- c(A %*% d)
-  curr_val <- f_d(d, Ad, alpha)
+  curr_val <- f_d(d, A, alpha)
   diagA <- Matrix::diag(A)
 
   while ((curr_val - prev_val) > tol && iter < max_iter) {
     prev_val <- curr_val
 
-    g <- gradient_d(d, Ad, alpha)
+    g <- gradient_d(d, A, alpha)
     H_diag <- -2 * (diagA + (1 - alpha) / (d^2))
 
     step <- -g / (H_diag - 1e-8)
@@ -54,7 +53,7 @@ gradient_line_search <- function(
     success <- FALSE
     for (bt in seq_len(max_ls_steps)) {
       d_new <- d + step_size * step
-      val_new <- f_d(d_new, A %*% d_new, alpha)
+      val_new <- f_d(d_new, A, alpha)
       if (val_new >= prev_val) {
         d <- d_new
         curr_val <- val_new
@@ -64,7 +63,7 @@ gradient_line_search <- function(
       step_size <- step_size * 0.5
     }
     if (!success) {
-      rlang::warn("Line search failed to improve objective in D after ", max_ls_steps, " steps. This should not occur. Please open issue to let us know.")
+      rlang::warn(paste0("Line search failed to improve objective in D after ", max_ls_steps, " steps. This should not occur. Please open issue to let us know."))
       break
     }
 
@@ -94,11 +93,11 @@ gradient_line_search <- function(
 #' A <- matrix(c(1, 2, 2, 4), 2, 2)
 #' alpha <- 0.5
 #' f.d(d, A, alpha) # -24.3
-f_d <- function(d, Ad, alpha) {
+f_d <- function(d, A, alpha) {
   if (any(d <= 0)) {
     return(-Inf)
   }
-  2 * (1 - alpha) * sum(log(d)) - sum(d * Ad)
+  2 * (1 - alpha) * sum(log(d)) - sum(d * c(A %*% d))
 }
 
 #' Compute the gradient of f at d
@@ -116,7 +115,7 @@ f_d <- function(d, Ad, alpha) {
 #' d <- c(1, 2)
 #' A <- matrix(c(1, 2, 2, 4), 2, 2)
 #' alpha <- 0.5
-#' gradient.d(d, A, alpha)
-gradient_d <- function(d, Ad, alpha) {
-  2 * ((1 - alpha) / d - Ad)
+#' gradient_d(d, A, alpha)
+gradient_d <- function(d, A, alpha) {
+  2 * ((1 - alpha) / d - c(A %*% d))
 }
