@@ -23,6 +23,16 @@ ROptim <- function(
 
   if (ans$niter == max_outer_iter + 1) {
     rlang::warn(paste0("Optimization of R matrix reached the max number of iterations (", max_outer_iter, "). Consider increasing the `max_iter_R_outer` parameter in `pcglassoFast()` function."))
+
+    smallest_eigen_value <- eigen(ans$wi, TRUE, TRUE)$values[p]
+    if (smallest_eigen_value < 0) {
+      rlang::warn("Optimization of R matrix resulted in a matrix that is not positive definite. We highly encourage to increse the `max_iter_R_outer` parameter in `pcglassoFast()` function.")
+
+      desired_smallest_eigen_value <- 0.01
+      x <- (1-desired_smallest_eigen_value) / (1-smallest_eigen_value)
+      ans$wi <- x*ans$wi + diag(1-x, p)
+      ans$w <- solve(ans$wi)
+    }
   }
 
   list(
