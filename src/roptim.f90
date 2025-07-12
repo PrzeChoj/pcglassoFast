@@ -13,8 +13,6 @@
 !
 !  TODO(Our comment)
 !
-!  TODO(Ensure X is positive-definite when maxIt is reached)
-!
 !  This subroutine computes the L1 regularized covariance matrix estimate
 !  using the algorithm described in the paper:
 !    J. Friedman, T. Hastie, R. Tibshirani:
@@ -111,11 +109,10 @@ else
    end do
 end if
 do iter = 1,maxIt
-   if (msg .ne. 0)  call intpr('iter:',-1,iter,1)
    dw = 0.0
    do j = 1,n
       WXj(1:n) = 0.0
-!     We exploit sparsity of X when computing column j of W*X*D:
+!     We exploit sparsity of X when computing column j of W*X:
       do i = 1,n
          if (X(i,j) .ne. 0.0) then
             WXj = WXj + W(:,i)*X(i,j)
