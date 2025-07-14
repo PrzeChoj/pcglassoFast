@@ -14,12 +14,13 @@ pcglassoFast(
   max_iter = 100,
   tolerance = 1e-06,
   tol_R_inner = 0.01,
-  tol_R_outer = 0.001,
+  tol_R_outer = 1e-04,
   max_iter_R_inner = 10,
   max_iter_R_outer = 100,
   tol_D = 1e-04,
   max_iter_D_newton = 500,
-  max_iter_D_ls = 100
+  max_iter_D_ls = 100,
+  verbose = FALSE
 )
 }
 \arguments{
@@ -45,6 +46,8 @@ matrix (it is recommended to left it default).}
 \item{tol_R_inner, tol_R_outer, max_iter_R_inner, max_iter_R_outer}{Parameters passed to \code{\link[=ROptim]{ROptim()}} function.}
 
 \item{tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=DOptim]{DOptim()}} function.}
+
+\item{verbose}{(boolian) print of loss.}
 }
 \value{
 list of three elements:
