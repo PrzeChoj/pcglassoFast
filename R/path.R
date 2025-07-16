@@ -70,7 +70,8 @@ pcglassoPath <- function(
     max_iter_R_outer = 100,
     tol_D = 1e-4,
     max_iter_D_newton = 500,
-    max_iter_D_ls = 100) {
+    max_iter_D_ls = 100,
+    verbose = FALSE) {
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
@@ -101,6 +102,9 @@ pcglassoPath <- function(
   D_curr <- D0
 
   for (k in 1:K) {
+    if (verbose) {
+      print(paste0("Path iteration: ", k))
+    }
     lambda_k <- lambdas[k]
 
     # run full blockwise optimization at this lambda
@@ -119,7 +123,8 @@ pcglassoPath <- function(
       max_iter_R_outer = max_iter_R_outer,
       tol_D = tol_D,
       max_iter_D_newton = max_iter_D_newton,
-      max_iter_D_ls = max_iter_D_ls
+      max_iter_D_ls = max_iter_D_ls,
+      verbose = verbose
     )
 
     # extract
