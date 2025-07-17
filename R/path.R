@@ -71,6 +71,7 @@ pcglassoPath <- function(
     tol_D = 1e-4,
     max_iter_D_newton = 500,
     max_iter_D_ls = 100,
+    diagonal_Newton = TRUE,
     verbose = FALSE) {
   stopifnot(
     is.matrix(S),
@@ -124,6 +125,7 @@ pcglassoPath <- function(
       tol_D = tol_D,
       max_iter_D_newton = max_iter_D_newton,
       max_iter_D_ls = max_iter_D_ls,
+      diagonal_Newton = diagonal_Newton,
       verbose = verbose
     )
 

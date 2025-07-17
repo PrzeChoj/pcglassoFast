@@ -48,7 +48,7 @@
 #'
 #' alpha <- 4 / 20 # 4 / n, as in Carter's paper
 #'
-#' pcglassoFast(S, 0.11, alpha, max_iter = 15)
+#' pcglassoFast(S, 0.11, alpha, max_iter = 15, diagonal_Newton = TRUE)
 pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
@@ -57,6 +57,7 @@ pcglassoFast <- function(
     max_iter_R_inner = 10, max_iter_R_outer = 100,
     tol_D = 1e-4,
     max_iter_D_newton = 500, max_iter_D_ls = 100,
+    diagonal_Newton = TRUE,
     verbose = FALSE) {
   stopifnot(
     is.matrix(S), nrow(S) == ncol(S),
@@ -76,7 +77,7 @@ pcglassoFast <- function(
       tol = tol_D,
       max_newton_iter = max_iter_D_newton,
       max_ls_steps = max_iter_D_ls,
-      alpha = alpha
+      alpha = alpha, diagonal_Newton = diagonal_Newton
     )
     proposed_loss <- function_to_optimize(R, resD$D, S, lambda, alpha)
     if (verbose) {

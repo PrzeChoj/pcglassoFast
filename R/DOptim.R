@@ -15,7 +15,8 @@ DOptim <- function(
     tol = 1e-4,
     max_newton_iter = 100,
     max_ls_steps = 15,
-    alpha = 0) {
+    alpha = 0,
+    diagonal_Newton = TRUE) {
   if (is.null(d0)) {
     d0 <- rep(1, ncol(A))
   }
@@ -24,7 +25,8 @@ DOptim <- function(
     d0, A, alpha,
     tol = tol,
     max_iter = max_newton_iter,
-    max_ls_steps = max_ls_steps
+    max_ls_steps = max_ls_steps,
+    diagonal_Newton = diagonal_Newton
   )
 }
 
@@ -34,7 +36,8 @@ gradient_line_search <- function(
     d, A, alpha,
     tol = 1e-4,
     max_iter = 100,
-    max_ls_steps = 15) {
+    max_ls_steps = 15,
+    diagonal_Newton = TRUE) {
   iter <- 0
   prev_val <- -Inf
   curr_val <- f_d(d, A, alpha)
@@ -44,15 +47,20 @@ gradient_line_search <- function(
     prev_val <- curr_val
 
     g <- gradient_d(d, A, alpha)
-    H_diag <- -2 * (diagA + (1 - alpha) / (d^2))
-
-    step <- -g / (H_diag - 1e-8)
+    step <- if (diagonal_Newton) {
+      H_diag <- -2 * (diagA + (1 - alpha) / (d^2))
+      -g / (H_diag - 1e-8)
+    } else {
+      H <- -2 * (diag((1 - alpha) / d^2, nrow(A)) + A)
+      -solve(H - diag(1e-8, nrow(H)), g)
+    }
 
     # Line Search
     step_size <- 1
     success <- FALSE
     for (bt in seq_len(max_ls_steps)) {
       d_new <- d + step_size * step
+      # TODO: What if d_new is < 0?
       val_new <- f_d(d_new, A, alpha)
       if (val_new >= prev_val) {
         d <- d_new
