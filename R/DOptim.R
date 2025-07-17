@@ -60,7 +60,7 @@ gradient_line_search <- function(
     success <- FALSE
     for (bt in seq_len(max_ls_steps)) {
       d_new <- d + step_size * step
-      # TODO: What if d_new is < 0?
+      # for negative d_new, the f_d() function returns -Infty
       val_new <- f_d(d_new, A, alpha)
       if (val_new >= prev_val) {
         d <- d_new
