@@ -3,6 +3,8 @@
 export(compare_matrices)
 export(cov2cor_inv)
 export(evaluate_loss_path)
+export(irrepGLASSO)
+export(irrepPCGLASSO)
 export(pcglassoFast)
 export(pcglassoPath)
 importFrom(Matrix,diag)
