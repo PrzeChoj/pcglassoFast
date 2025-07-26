@@ -135,8 +135,10 @@ pcglassoPath <- function(
 
     # record
     outR[[k]] <- R_curr
+    outRi[[k]] <- Rinv_curr
     outD[[k]] <- D_curr
     outW[[k]] <- R_curr * (D_curr %o% D_curr)
+    outWi[[k]] <- Rinv_curr * (D_curr %o% D_curr)
     iters[k] <- fit$n_iters
     losses[k] <- tail(fit$loss, 1)
 
@@ -151,8 +153,10 @@ pcglassoPath <- function(
   used <- 1:k
   lambdas <- lambdas[used]
   outR <- outR[used]
+  outRi <- outRi[used]
   outD <- outD[used]
   outW <- outW[used]
+  outWi <- outWi[used]
   losses <- losses[used]
   iters <- iters[used]
 
@@ -160,8 +164,10 @@ pcglassoPath <- function(
   list(
     lambdas = lambdas,
     R_path = outR,
+    Ri_path = outRi,
     D_path = outD,
     W_path = outW,
+    Wi_path = outWi,
     loss = losses,
     iters = iters
   )
