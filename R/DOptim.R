@@ -20,6 +20,7 @@ DOptim <- function(
   if (is.null(d0)) {
     d0 <- rep(1, ncol(A))
   }
+  stopifnot(all(d0 > 0))
 
   gradient_line_search(
     d0, A, alpha,
