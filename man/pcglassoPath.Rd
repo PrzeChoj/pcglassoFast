@@ -16,8 +16,7 @@ pcglassoPath(
   D0 = rep(1, nrow(S)),
   max_iter = 100,
   tolerance = 1e-06,
-  tol_R_inner = 0.01,
-  tol_R_outer = 0.001,
+  tol_R = 0.001,
   max_iter_R_inner = 10,
   max_iter_R_outer = 100,
   tol_D = 1e-04,
@@ -47,7 +46,7 @@ the lambda‑path search stops early.}
 
 \item{D0}{(numeric vector of length p) initial diagonal entries; default is \code{rep(1,p)}.}
 
-\item{max_iter, tolerance, tol_R_inner, tol_R_outer, max_iter_R_inner, max_iter_R_outer, tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=pcglassoFast]{pcglassoFast()}} for each \code{lambda}.}
+\item{max_iter, tolerance, tol_R, max_iter_R_inner, max_iter_R_outer, tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=pcglassoFast]{pcglassoFast()}} for each \code{lambda}.}
 }
 \value{
 A list with components:

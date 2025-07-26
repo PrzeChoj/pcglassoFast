@@ -11,7 +11,7 @@
 #'         matrix (it is recommended to left it default).
 #' @param max_iter (integer) maximum number of iterations.
 #' @param tolerance (double) tolerance for convergence.
-#' @param tol_R_inner,tol_R_outer,max_iter_R_inner,max_iter_R_outer
+#' @param tol_R,max_iter_R_inner,max_iter_R_outer
 #'         Parameters passed to [ROptim()] function.
 #' @param tol_D,max_iter_D_newton,max_iter_D_ls
 #'         Parameters passed to [DOptim()] function.
@@ -53,7 +53,7 @@ pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
     max_iter = 100, tolerance = 1e-6,
-    tol_R_inner = 1e-2, tol_R_outer = 1e-4,
+    tol_R = 1e-4,
     max_iter_R_inner = 10, max_iter_R_outer = 100,
     tol_D = 1e-4,
     max_iter_D_newton = 500, max_iter_D_ls = 100,
@@ -99,8 +99,7 @@ pcglassoFast <- function(
       R = R,
       Rinv = R_inv,
       lambda = lambda,
-      tol_inner = tol_R_inner,
-      tol_outer = tol_R_outer,
+      tol = tol_R,
       max_inner_iter = max_iter_R_inner,
       max_outer_iter = max_iter_R_outer
     )
@@ -108,8 +107,8 @@ pcglassoFast <- function(
     if (verbose) {
       print(paste0(round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
     }
-    if (proposed_loss <= loss_history[length(loss_history)] - (tol_R_outer * 2)) {
-      rlang::warn("R optimization decreased the goal. This should not occur. We recommend to decrease the `tol_R_outer` parameter.")
+    if (proposed_loss <= loss_history[length(loss_history)] - (tol_R * 2)) {
+      rlang::warn("R optimization decreased the goal. This should not occur. We recommend to decrease the `tol_R` parameter.")
       break
     }
     R <- resR$R

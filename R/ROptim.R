@@ -3,21 +3,18 @@ ROptim <- function(
     R,
     Rinv,
     lambda,
-    tol_inner = 1e-4,
-    tol_outer = 1e-4,
+    tol = 1e-4,
     max_inner_iter = 10,
     max_outer_iter = 100) {
   if (is.null(Rinv)) {
     Rinv <- solve(R)
   }
 
-  # TODO: tol_inner
-
   p <- dim(R)[1]
   lambda_matrix <- matrix(lambda, p, p); diag(lambda_matrix) <- 0
   ans <- ROptim_to_fortran(
     S,
-    rho = lambda_matrix, thr = tol_outer, maxIt = max_outer_iter,
+    rho = lambda_matrix, thr = tol, maxIt = max_outer_iter,
     maxItLasso = max_inner_iter, start = "warm", Rinv_init = Rinv, R_init = R
   )
 
