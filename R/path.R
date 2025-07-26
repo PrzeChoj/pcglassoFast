@@ -94,7 +94,7 @@ pcglassoPath <- function(
 
   # prepare storage
   K <- length(lambdas)
-  outW <- outD <- outR <- vector("list", K)
+  outW <- outWi <- outD <- outR <- outRi <- vector("list", K)
   losses <- iters <- numeric(K)
 
   # warm start
