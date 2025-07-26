@@ -48,7 +48,7 @@
 #'
 #' alpha <- 4 / 20 # 4 / n, as in Carter's paper
 #'
-#' pcglassoFast(S, 0.11, alpha, max_iter = 15, diagonal_Newton = TRUE)
+#' pcglassoFast(S, 0.11, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = TRUE)
 pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
@@ -69,6 +69,9 @@ pcglassoFast <- function(
 
   stop_loop <- FALSE
   loss_history <- function_to_optimize(R, D, S, lambda, alpha)
+  if (verbose) {
+    print(paste0(round(loss_history, 4), ", starting loss"))
+  }
   while (!stop_loop && (length(loss_history)/2) < max_iter) {
     # D step
     resD <- DOptim(
@@ -81,7 +84,7 @@ pcglassoFast <- function(
     )
     proposed_loss <- function_to_optimize(R, resD$D, S, lambda, alpha)
     if (verbose) {
-      print(proposed_loss)
+      print(paste0(round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
     }
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_D * 2)) {
       rlang::warn("D optimization decreased the goal. This should not occur. We recommend to decrease the `tol_D` parameter.")
@@ -103,7 +106,7 @@ pcglassoFast <- function(
     )
     proposed_loss <- function_to_optimize(resR$R, D, S, lambda, alpha)
     if (verbose) {
-      print(proposed_loss)
+      print(paste0(round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
     }
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_R_outer * 2)) {
       rlang::warn("R optimization decreased the goal. This should not occur. We recommend to decrease the `tol_R_outer` parameter.")
