@@ -35,6 +35,7 @@ irrepPCGLASSO <- function(K) {
 
   non_zero_indices <- which( abs(K) >  0.00000001 )
   zero_indices     <- which( abs(K) <= 0.00000001 )
+  stopifnot(length(zero_indices) > 0) # TODO: serve this edgecase
   diagonal_indices <- which( diag(p) == 1)
 
   P_diag <- diag(p*p); diag(P_diag)[-diagonal_indices] <- 0
@@ -74,6 +75,7 @@ irrepPCGLASSO <- function(K) {
 irrepGLASSO <- function(K){
   non_zero_indices <- which( abs(K) >  0.00000001 )
   zero_indices     <- which( abs(K) <= 0.00000001 )
+  stopifnot(length(zero_indices) > 0) # TODO: serve this edgecase
   Kinverse <- solve(K)
 
   Gamma <- pracma::kron(Kinverse, Kinverse)
