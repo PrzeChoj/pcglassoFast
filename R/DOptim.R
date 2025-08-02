@@ -16,7 +16,8 @@ DOptim <- function(
     max_newton_iter = 100,
     max_ls_steps = 15,
     alpha = 0,
-    diagonal_Newton = TRUE) {
+    diagonal_Newton = TRUE,
+    Wolfe = FALSE) {
   if (is.null(d0)) {
     d0 <- rep(1, ncol(A))
   }
@@ -27,7 +28,8 @@ DOptim <- function(
     tol = tol,
     max_iter = max_newton_iter,
     max_ls_steps = max_ls_steps,
-    diagonal_Newton = diagonal_Newton
+    diagonal_Newton = diagonal_Newton,
+    Wolfe = Wolfe
   )
 }
 
@@ -38,7 +40,8 @@ gradient_line_search <- function(
     tol = 1e-4,
     max_iter = 100,
     max_ls_steps = 15,
-    diagonal_Newton = TRUE) {
+    diagonal_Newton = TRUE,
+    Wolfe = FALSE) {
   iter <- 0
   prev_val <- -Inf
   curr_val <- f_d(d, A, alpha)
@@ -57,23 +60,28 @@ gradient_line_search <- function(
     }
 
     # Line Search
-    step_size <- 1
-    success <- FALSE
-    for (bt in seq_len(max_ls_steps)) {
-      d_new <- d + step_size * step
-      # for negative d_new, the f_d() function returns -Infty
-      val_new <- f_d(d_new, A, alpha)
-      if (val_new >= prev_val) {
-        d <- d_new
-        curr_val <- val_new
-        success <- TRUE
+    if (!Wolfe) {
+      success <- TRUE
+      step_size <- 1
+      for (bt in seq_len(max_ls_steps)) {
+        d_new <- d + step_size * step
+        # for negative d_new, the f_d() function returns -Infty
+        val_new <- f_d(d_new, A, alpha)
+        if (val_new >= prev_val) {
+          d <- d_new
+          curr_val <- val_new
+          success <- TRUE
+          break
+        }
+        step_size <- step_size * 0.5
+      }
+      if (!success) {
+        rlang::warn(paste0("Line search failed to improve objective in D after ", max_ls_steps, " steps. This should not occur. Please open issue to let us know."))
         break
       }
-      step_size <- step_size * 0.5
-    }
-    if (!success) {
-      rlang::warn(paste0("Line search failed to improve objective in D after ", max_ls_steps, " steps. This should not occur. Please open issue to let us know."))
-      break
+    } else {
+      step_size <- find_step_size(A, alpha, d, step, prev_val, g, max_ls_steps)
+      d <- d + step_size * step
     }
 
     iter <- iter + 1
@@ -127,4 +135,72 @@ f_d <- function(d, A, alpha) {
 #' gradient_d(d, A, alpha)
 gradient_d <- function(d, A, alpha) {
   2 * ((1 - alpha) / d - c(A %*% d))
+}
+
+zoom_step_size <- function(
+    step_lo, step_hi,
+    phi, dphi,
+    prev_val, dphi0,
+    c1, c2,
+    max_zoom_iter = 50) {
+
+  for (iter in seq_len(max_zoom_iter)) {
+    step_j <- 0.5 * (step_lo + step_hi)
+
+    ## Armijo-increase failure OR not better than lower end
+    if (phi(step_j) < prev_val + c1 * step_j * dphi0 ||
+        phi(step_j) <= phi(step_lo)) {
+      step_hi <- step_j
+    } else {
+      ## Curvature condition met – accept
+      if (abs(dphi(step_j)) <= c2 * dphi0)
+        return(step_j)
+
+      if (dphi(step_j) * (step_hi - step_lo) >= 0)
+        step_hi <- step_lo
+      step_lo <- step_j
+    }
+  }
+  warning("zoom_step_size(): reached max iterations; returning last candidate.")
+  step_j
+}
+
+find_step_size <- function(
+    A, alpha, d, step, prev_val, g,
+    max_ls_steps,
+    c1 = 1e-4, c2 = 0.9) {
+
+  ## local closures that see d & step
+  phi  <- function(s) f_d(d + s * step, A, alpha)
+  dphi <- function(s) sum(gradient_d(d + s * step, A, alpha) * step)
+
+  # directional derivative at s = 0
+  dphi0 <- sum(g * step)
+  if (dphi0 <= 0)
+    stop("`step` must be an *ascent* direction.")
+
+  step_prev <- 0
+  step_size <- 1
+
+  for (i in seq_len(max_ls_steps)) {
+    ## Armijo-increase + monotonicity test
+    if (phi(step_size) < prev_val + c1 * step_size * dphi0 ||
+        (i > 1 && phi(step_size) <= phi(step_prev))) {
+      return(zoom_step_size(step_prev, step_size, phi, dphi, prev_val, dphi0, c1, c2))
+    }
+
+    ## Curvature condition satisfied -> accept step
+    if (abs(dphi(step_size)) <= c2 * dphi0)
+      return(step_size)
+
+    if (dphi(step_size) <= 0)
+      return(zoom_step_size(step_size, step_prev, phi, dphi, prev_val, dphi0, c1, c2))
+
+    ## Otherwise keep marching forward
+    step_prev <- step_size
+    step_size <- step_size * 2
+  }
+
+  warning("find_step_size(): hit `max_ls_steps`; returning last tried value.")
+  step_size
 }
