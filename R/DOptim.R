@@ -61,7 +61,7 @@ gradient_line_search <- function(
 
     # Line Search
     if (!Wolfe) {
-      success <- TRUE
+      success <- FALSE
       step_size <- 1
       for (bt in seq_len(max_ls_steps)) {
         d_new <- d + step_size * step
@@ -109,7 +109,7 @@ gradient_line_search <- function(
 #' d <- as.matrix(c(1, 2))
 #' A <- matrix(c(1, 2, 2, 4), 2, 2)
 #' alpha <- 0.5
-#' f.d(d, A, alpha) # -24.3
+#' f_d(d, A, alpha) # -24.3
 f_d <- function(d, A, alpha) {
   if (any(d <= 0)) {
     return(-Inf)
@@ -147,16 +147,17 @@ zoom_step_size <- function(
   for (iter in seq_len(max_zoom_iter)) {
     step_j <- 0.5 * (step_lo + step_hi)
 
-    ## Armijo-increase failure OR not better than lower end
-    if (phi(step_j) < prev_val + c1 * step_j * dphi0 ||
-        phi(step_j) <= phi(step_lo)) {
+    phi_j  <- phi(step_j)
+    phi_lo <- phi(step_lo)
+
+    if (phi_j < prev_val + c1 * step_j * dphi0 || phi_j <= phi_lo) {
       step_hi <- step_j
     } else {
-      ## Curvature condition met – accept
-      if (abs(dphi(step_j)) <= c2 * dphi0)
+      dphi_j <- dphi(step_j)
+      if (abs(dphi_j) <= c2 * dphi0)
         return(step_j)
 
-      if (dphi(step_j) * (step_hi - step_lo) >= 0)
+      if (dphi_j * (step_hi - step_lo) >= 0)
         step_hi <- step_lo
       step_lo <- step_j
     }
@@ -179,25 +180,25 @@ find_step_size <- function(
   if (dphi0 <= 0)
     stop("`step` must be an *ascent* direction.")
 
-  step_prev <- 0
-  step_size <- 1
+  step_prev  <- 0
+  phi_prev   <- prev_val
+  step_size  <- 1
 
   for (i in seq_len(max_ls_steps)) {
-    ## Armijo-increase + monotonicity test
-    if (phi(step_size) < prev_val + c1 * step_size * dphi0 ||
-        (i > 1 && phi(step_size) <= phi(step_prev))) {
+    phi_curr  <- phi(step_size)
+
+    if (phi_curr < prev_val + c1 * step_size * dphi0 || (i > 1 && phi_curr <= phi_prev)) {
       return(zoom_step_size(step_prev, step_size, phi, dphi, prev_val, dphi0, c1, c2))
     }
 
-    ## Curvature condition satisfied -> accept step
-    if (abs(dphi(step_size)) <= c2 * dphi0)
+    dphi_curr <- dphi(step_size)
+    if (abs(dphi_curr) <= c2 * dphi0)
       return(step_size)
-
-    if (dphi(step_size) <= 0)
+    if (dphi_curr <= 0)
       return(zoom_step_size(step_size, step_prev, phi, dphi, prev_val, dphi0, c1, c2))
 
-    ## Otherwise keep marching forward
     step_prev <- step_size
+    phi_prev  <- phi_curr
     step_size <- step_size * 2
   }
 
