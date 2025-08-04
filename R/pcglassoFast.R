@@ -58,8 +58,7 @@ pcglassoFast <- function(
     tol_D = 1e-4,
     max_iter_D_newton = 500, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
-    verbose = FALSE,
-    Wolfe_in_D = FALSE) {
+    verbose = FALSE) {
   stopifnot(
     is.matrix(S), nrow(S) == ncol(S),
     is.numeric(lambda), lambda >= 0,
@@ -81,8 +80,7 @@ pcglassoFast <- function(
       tol = tol_D,
       max_newton_iter = max_iter_D_newton,
       max_ls_steps = max_iter_D_ls,
-      alpha = alpha, diagonal_Newton = diagonal_Newton,
-      Wolfe = Wolfe_in_D
+      alpha = alpha, diagonal_Newton = diagonal_Newton
     )
     proposed_loss <- function_to_optimize(R, resD$D, S, lambda, alpha)
     if (verbose) {
