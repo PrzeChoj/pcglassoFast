@@ -16,8 +16,7 @@ DOptim <- function(
     max_newton_iter = 100,
     max_ls_steps = 15,
     alpha = 0,
-    diagonal_Newton = TRUE,
-    Wolfe = FALSE) {
+    diagonal_Newton = TRUE) {
   if (is.null(d0)) {
     d0 <- rep(1, ncol(A))
   }
@@ -28,8 +27,7 @@ DOptim <- function(
     tol = tol,
     max_iter = max_newton_iter,
     max_ls_steps = max_ls_steps,
-    diagonal_Newton = diagonal_Newton,
-    Wolfe = Wolfe
+    diagonal_Newton = diagonal_Newton
   )
 }
 
@@ -40,8 +38,7 @@ gradient_line_search <- function(
     tol = 1e-4,
     max_iter = 100,
     max_ls_steps = 15,
-    diagonal_Newton = TRUE,
-    Wolfe = FALSE) {
+    diagonal_Newton = TRUE) {
   iter <- 0
   prev_val <- -Inf
   curr_val <- f_d(d, A, alpha)
@@ -60,29 +57,8 @@ gradient_line_search <- function(
     }
 
     # Line Search
-    if (!Wolfe) {
-      success <- FALSE
-      step_size <- 1
-      for (bt in seq_len(max_ls_steps)) {
-        d_new <- d + step_size * step
-        # for negative d_new, the f_d() function returns -Infty
-        val_new <- f_d(d_new, A, alpha)
-        if (val_new >= prev_val) {
-          d <- d_new
-          curr_val <- val_new
-          success <- TRUE
-          break
-        }
-        step_size <- step_size * 0.5
-      }
-      if (!success) {
-        rlang::warn(paste0("Line search failed to improve objective in D after ", max_ls_steps, " steps. This should not occur. Please open issue to let us know."))
-        break
-      }
-    } else {
-      step_size <- find_step_size(A, alpha, d, step, prev_val, g, max_ls_steps)
-      d <- d + step_size * step
-    }
+    step_size <- find_step_size(A, alpha, d, step, prev_val, g, max_ls_steps)
+    d <- d + step_size * step
 
     iter <- iter + 1
   }
