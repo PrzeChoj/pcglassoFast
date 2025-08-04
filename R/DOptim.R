@@ -118,7 +118,7 @@ zoom_step_size <- function(
     phi, dphi,
     prev_val, dphi0,
     c1, c2,
-    max_zoom_iter = 50) {
+    max_zoom_iter) {
 
   for (iter in seq_len(max_zoom_iter)) {
     step_j <- 0.5 * (step_lo + step_hi)
@@ -164,14 +164,14 @@ find_step_size <- function(
     phi_curr  <- phi(step_size)
 
     if (phi_curr < prev_val + c1 * step_size * dphi0 || (i > 1 && phi_curr <= phi_prev)) {
-      return(zoom_step_size(step_prev, step_size, phi, dphi, prev_val, dphi0, c1, c2))
+      return(zoom_step_size(step_prev, step_size, phi, dphi, prev_val, dphi0, c1, c2, max_zoom_iter = max_ls_steps))
     }
 
     dphi_curr <- dphi(step_size)
     if (abs(dphi_curr) <= c2 * dphi0)
       return(step_size)
     if (dphi_curr <= 0)
-      return(zoom_step_size(step_size, step_prev, phi, dphi, prev_val, dphi0, c1, c2))
+      return(zoom_step_size(step_size, step_prev, phi, dphi, prev_val, dphi0, c1, c2, max_zoom_iter = max_ls_steps))
 
     step_prev <- step_size
     phi_prev  <- phi_curr
