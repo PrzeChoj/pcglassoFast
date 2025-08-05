@@ -11,8 +11,7 @@ DOptim(
   max_newton_iter = 100,
   max_ls_steps = 15,
   alpha = 0,
-  diagonal_Newton = TRUE,
-  Wolfe = FALSE
+  diagonal_Newton = TRUE
 )
 }
 \arguments{
