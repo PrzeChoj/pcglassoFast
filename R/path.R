@@ -78,7 +78,7 @@ pcglassoPath <- function(
     nrow(S) == ncol(S),
     nrow(R0) == ncol(R0),
     nrow(R0) == nrow(S),
-    length(D) == nrow(S),
+    length(D0) == nrow(S),
     is.numeric(alpha),
     is.null(lambdas) || is.numeric(lambdas),
     min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
