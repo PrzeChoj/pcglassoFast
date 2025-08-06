@@ -153,7 +153,9 @@ find_step_size <- function(
 
   # directional derivative at s = 0
   dphi0 <- sum(g * step)
-  if (dphi0 <= 0)
+  if (dphi0 == 0)
+    return(0)
+  if (dphi0 < 0)
     stop("`step` must be an *ascent* direction.")
 
   step_prev  <- 0
