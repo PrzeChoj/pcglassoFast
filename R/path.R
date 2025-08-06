@@ -46,7 +46,7 @@
 #' resPath <- pcglassoPath(
 #'   S, alpha,
 #'   nlambda = 20,
-#'   min_lambda_ratio = 0.05,
+#'   min_lambda_ratio = 0.01,
 #'   max_edge_fraction = 0.4,
 #'   verbose = TRUE
 #' )
@@ -76,6 +76,9 @@ pcglassoPath <- function(
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
+    nrow(R0) == ncol(R0),
+    nrow(R0) == nrow(S),
+    length(D) == nrow(S),
     is.numeric(alpha),
     is.null(lambdas) || is.numeric(lambdas),
     min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
@@ -138,7 +141,7 @@ pcglassoPath <- function(
     outRi[[k]] <- Rinv_curr
     outD[[k]] <- D_curr
     outW[[k]] <- R_curr * (D_curr %o% D_curr)
-    outWi[[k]] <- Rinv_curr * (D_curr %o% D_curr)
+    outWi[[k]] <- Rinv_curr * ((1/D_curr) %o% (1/D_curr))
     iters[k] <- fit$n_iters
     losses[k] <- tail(fit$loss, 1)
 
