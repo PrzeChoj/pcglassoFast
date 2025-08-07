@@ -82,7 +82,8 @@ pcglassoPath <- function(
     is.numeric(alpha),
     is.null(lambdas) || is.numeric(lambdas),
     min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
-    max_edge_fraction >= 0 && max_edge_fraction <= 1
+    max_edge_fraction >= 0 && max_edge_fraction <= 1,
+    length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton)
   )
 
   p <- nrow(S)

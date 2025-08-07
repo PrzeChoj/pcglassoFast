@@ -64,7 +64,8 @@ pcglassoFast <- function(
     is.numeric(lambda), lambda >= 0,
     is.numeric(alpha),
     max_iter >= 1, tolerance > 0,
-    is.matrix(R), is.matrix(R_inv)
+    is.matrix(R), is.matrix(R_inv),
+    length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton)
   )
 
   stop_loop <- FALSE
