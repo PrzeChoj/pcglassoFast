@@ -91,7 +91,7 @@ pcglassoPath <- function(
 
   # build lambda‐grid if needed
   if (is.null(lambdas)) {
-    lam_max <- max(abs(S - diag(diag(S))))
+    lam_max <- max(abs(cov2cor(S) - diag(ncol(S)))) + 0.001
     lam_min <- min_lambda_ratio * lam_max
     lambdas <- exp(seq(log(lam_max), log(lam_min), length.out = nlambda))
   }
