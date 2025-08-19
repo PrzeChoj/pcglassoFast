@@ -3,9 +3,11 @@ Package: pcglassoFast
 Title: Fast Partial Correlation Graphical LASSO
 Version: 0.0.0.9000
 Date: 2025-04-13
-Authors@R: 
+Authors@R: c(
     person(c("Adam", "Przemysław"), "Chojecki", , "adam.prze.choj@gmail.com", role = c("aut", "cre"),
-           comment = c(ORCID = "0009-0008-2902-4096"))
+           comment = c(ORCID = "0009-0008-2902-4096")),
+    person("Jonas", "Wallin", , "jonas.wallin81@gmail.com", role = "aut")
+  )
 Description: A fast and improved implementation of the Partial Correlation
     graphical LASSO.
 License: GPL (>= 3)
@@ -14,7 +16,11 @@ Depends:
     R (>= 3.5)
 Imports: 
     Matrix,
-    rlang
+    methods,
+    pracma,
+    rlang,
+    stats,
+    utils
 Suggests: 
     PCGLASSO
 Encoding: UTF-8

@@ -2,7 +2,7 @@
 % Please edit documentation in R/DOptim.R
 \name{DOptim}
 \alias{DOptim}
-\title{Diagonal Newton optimization for f(d)}
+\title{Optimze in D given R}
 \usage{
 DOptim(
   A,
@@ -31,5 +31,5 @@ DOptim(
 list with D, iterations, and final value
 }
 \description{
-Diagonal Newton optimization for f(d)
+Optimze in D given R
 }

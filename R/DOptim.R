@@ -1,6 +1,6 @@
 ## Refactored version of DOptim and helpers with minor readability improvements
 
-#' Diagonal Newton optimization for f(d)
+#' Optimze in D given R
 #'
 #' @param A symmetric matrix (p x p); A = R * S
 #' @param d0 initial vector (defaults to ones)

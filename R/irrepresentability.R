@@ -13,6 +13,8 @@
 #'
 #' @export
 #'
+#' @importFrom pracma kron
+#'
 #' @examples
 #' set.seed(123)
 #' p <- 7

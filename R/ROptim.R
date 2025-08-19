@@ -1,3 +1,4 @@
+#' Optimize in R given D
 ROptim <- function(
     S,
     R,
