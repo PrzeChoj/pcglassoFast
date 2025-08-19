@@ -48,7 +48,7 @@
 #'
 #' alpha <- 4 / 20 # 4 / n, as in Carter's paper
 #'
-#' pcglassoFast(S, 0.11, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = TRUE, Wolfe_in_D = TRUE)
+#' pcglassoFast(S, 0.11, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = TRUE)
 pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
@@ -64,7 +64,8 @@ pcglassoFast <- function(
     is.numeric(lambda), lambda >= 0,
     is.numeric(alpha),
     max_iter >= 1, tolerance > 0,
-    is.matrix(R), is.matrix(R_inv)
+    is.matrix(R), is.matrix(R_inv),
+    length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton)
   )
 
   stop_loop <- FALSE
@@ -91,7 +92,7 @@ pcglassoFast <- function(
       print(paste0(round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
     }
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_D * 2)) {
-      rlang::warn("D optimization decreased the goal. This should not occur. We recommend to decrease the `tol_D` parameter.")
+      rlang::warn("D optimization decreased the goal. We recommend to decrease the `tol_D` parameter.")
       break
     }
     D <- resD$D
@@ -112,7 +113,7 @@ pcglassoFast <- function(
       print(paste0(round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
     }
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_R * 2)) {
-      rlang::warn("R optimization decreased the goal. This should not occur. We recommend to decrease the `tol_R` parameter.")
+      rlang::warn("R optimization decreased the goal. We recommend to decrease the `tol_R` parameter.")
       break
     }
     R <- resR$R

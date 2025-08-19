@@ -20,8 +20,7 @@ pcglassoFast(
   max_iter_D_newton = 500,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
-  verbose = FALSE,
-  Wolfe_in_D = FALSE
+  verbose = FALSE
 )
 }
 \arguments{
@@ -83,7 +82,7 @@ S <- solve(S_inv.true) # data
 
 alpha <- 4 / 20 # 4 / n, as in Carter's paper
 
-pcglassoFast(S, 0.11, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = TRUE, Wolfe_in_D = TRUE)
+pcglassoFast(S, 0.11, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = TRUE)
 }
 \seealso{
 \code{\link[=pcglassoPath]{pcglassoPath()}} to compute a full λ‑path of solutions

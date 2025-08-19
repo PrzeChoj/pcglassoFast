@@ -1,6 +1,6 @@
 ## Refactored version of DOptim and helpers with minor readability improvements
 
-#' Diagonal Newton optimization for f(d)
+#' Optimze in D given R
 #'
 #' @param A symmetric matrix (p x p); A = R * S
 #' @param d0 initial vector (defaults to ones)
@@ -32,7 +32,6 @@ DOptim <- function(
 }
 
 #' @importFrom Matrix diag
-#' @importFrom rlang warn
 gradient_line_search <- function(
     d, A, alpha,
     tol = 1e-4,
@@ -153,7 +152,9 @@ find_step_size <- function(
 
   # directional derivative at s = 0
   dphi0 <- sum(g * step)
-  if (dphi0 <= 0)
+  if (dphi0 == 0)
+    return(0)
+  if (dphi0 < 0)
     stop("`step` must be an *ascent* direction.")
 
   step_prev  <- 0

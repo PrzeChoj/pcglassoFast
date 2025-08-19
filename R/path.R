@@ -35,6 +35,9 @@
 #' @seealso \code{\link{pcglassoFast}} for a single‑lambda blockwise optimizer.
 #' @export
 #'
+#' @importFrom utils tail
+#' @importFrom stats cov2cor
+#'
 #' @examples
 #' p <- 7
 #' R.true <- toeplitz(c(1, -0.5, rep(0, p - 2)))
@@ -46,7 +49,7 @@
 #' resPath <- pcglassoPath(
 #'   S, alpha,
 #'   nlambda = 20,
-#'   min_lambda_ratio = 0.05,
+#'   min_lambda_ratio = 0.01,
 #'   max_edge_fraction = 0.4,
 #'   verbose = TRUE
 #' )
@@ -76,10 +79,14 @@ pcglassoPath <- function(
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
+    nrow(R0) == ncol(R0),
+    nrow(R0) == nrow(S),
+    length(D0) == nrow(S),
     is.numeric(alpha),
     is.null(lambdas) || is.numeric(lambdas),
     min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
-    max_edge_fraction >= 0 && max_edge_fraction <= 1
+    max_edge_fraction >= 0 && max_edge_fraction <= 1,
+    length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton)
   )
 
   p <- nrow(S)
@@ -87,7 +94,7 @@ pcglassoPath <- function(
 
   # build lambda‐grid if needed
   if (is.null(lambdas)) {
-    lam_max <- max(abs(S - diag(diag(S))))
+    lam_max <- max(abs(stats::cov2cor(S) - diag(ncol(S)))) + 0.001
     lam_min <- min_lambda_ratio * lam_max
     lambdas <- exp(seq(log(lam_max), log(lam_min), length.out = nlambda))
   }
@@ -138,9 +145,9 @@ pcglassoPath <- function(
     outRi[[k]] <- Rinv_curr
     outD[[k]] <- D_curr
     outW[[k]] <- R_curr * (D_curr %o% D_curr)
-    outWi[[k]] <- Rinv_curr * (D_curr %o% D_curr)
+    outWi[[k]] <- Rinv_curr * ((1/D_curr) %o% (1/D_curr))
     iters[k] <- fit$n_iters
-    losses[k] <- tail(fit$loss, 1)
+    losses[k] <- utils::tail(fit$loss, 1)
 
     # compute edge fraction and early stop
     edge_frac <- (sum(R_curr != 0) - p) / (p * (p - 1))
@@ -189,9 +196,11 @@ pcglassoPath <- function(
 #'                      $forbenious
 #'                      $n_param
 #'                      $BIC_gamma the average BIC_gamma
+#'
+#' @importFrom methods is
 #' @export
 evaluate_loss_path <- function(precision_array, Sigma, n, gamma = 0.5) {
-  if ("list" %in% is(precision_array)) {
+  if ("list" %in% methods::is(precision_array)) {
     W <- precision_array$W_path
     precision_array <- simplify2array(W)
   }
