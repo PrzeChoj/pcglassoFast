@@ -1,8 +1,8 @@
 Type: Package
 Package: pcglassoFast
 Title: Fast Partial Correlation Graphical LASSO
-Version: 0.0.0.9000
-Date: 2025-04-13
+Version: 0.1.0
+Date: 2025-08-19
 Authors@R: c(
     person(c("Adam", "Przemysław"), "Chojecki", , "adam.prze.choj@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0009-0008-2902-4096")),
