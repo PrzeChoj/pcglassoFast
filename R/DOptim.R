@@ -32,7 +32,6 @@ DOptim <- function(
 }
 
 #' @importFrom Matrix diag
-#' @importFrom rlang warn
 gradient_line_search <- function(
     d, A, alpha,
     tol = 1e-4,

@@ -79,7 +79,7 @@ alpha <- 4 / 20
 resPath <- pcglassoPath(
   S, alpha,
   nlambda = 20,
-  min_lambda_ratio = 0.05,
+  min_lambda_ratio = 0.01,
   max_edge_fraction = 0.4,
   verbose = TRUE
 )
