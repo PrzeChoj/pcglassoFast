@@ -54,7 +54,7 @@ pcglassoFast <- function(
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
     max_iter = 100, tolerance = 1e-6,
     tol_R = 1e-4,
-    max_iter_R_inner = 10, max_iter_R_outer = 100,
+    max_iter_R_inner = 500, max_iter_R_outer = 100,
     tol_D = 1e-4,
     max_iter_D_newton = 500, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
@@ -88,7 +88,6 @@ pcglassoFast <- function(
       print(paste0(round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
     }
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_D * 2)) {
-      rlang::warn("D optimization decreased the goal. We recommend to decrease the `tol_D` parameter.")
       break
     }
     D <- resD$D
@@ -109,7 +108,6 @@ pcglassoFast <- function(
       print(paste0(round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
     }
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_R * 2)) {
-      rlang::warn("R optimization decreased the goal. We recommend to decrease the `tol_R` parameter.")
       break
     }
     R <- resR$R
