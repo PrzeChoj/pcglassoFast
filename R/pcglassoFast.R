@@ -71,7 +71,7 @@ pcglassoFast <- function(
   stop_loop <- FALSE
   loss_history <- function_to_optimize(R, D, S, lambda, alpha)
   if (verbose) {
-    print(paste0(round(loss_history, 4), ", starting loss"))
+    print(paste0("starting loss: ", round(loss_history, 4)))
   }
   while (!stop_loop && (length(loss_history)/2) < max_iter) {
     # D step
@@ -85,7 +85,7 @@ pcglassoFast <- function(
     )
     proposed_loss <- function_to_optimize(R, resD$D, S, lambda, alpha)
     if (verbose) {
-      print(paste0(round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
+      print(paste0("loss: ", round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
     }
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_D * 2)) {
       break
@@ -105,9 +105,12 @@ pcglassoFast <- function(
     )
     proposed_loss <- function_to_optimize(resR$R, D, S, lambda, alpha)
     if (verbose) {
-      print(paste0(round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
+      print(paste0("loss: ", round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
     }
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_R * 2)) {
+      if (verbose) {
+        print("ending optimization as loss increased")
+      }
       break
     }
     R <- resR$R
@@ -116,6 +119,16 @@ pcglassoFast <- function(
 
     # loop
     stop_loop <- (loss_history[length(loss_history)] - loss_history[length(loss_history) - 2] < tolerance)
+    if (verbose && stop_loop) {
+      print(paste0(
+        "ending optimization as loss decreased by ",
+        loss_history[length(loss_history)] - loss_history[length(loss_history) - 2],
+        ", which is less than a tolerance (", tolerance, ")"))
+    }
+
+    if (verbose && (length(loss_history)/2) >= max_iter) {
+      print(paste0("ending optimization as number of iterations reached max_iter (", max_iter, ")"))
+    }
   }
 
   D <- as.vector(D)
