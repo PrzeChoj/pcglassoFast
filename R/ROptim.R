@@ -26,7 +26,7 @@ ROptim <- function(
   smallest_eigen_value <- eigen(ans$wi, TRUE, TRUE)$values[p]
   if (smallest_eigen_value < 0) {
     rlang::warn(paste0(
-      "Optimization of the R matrix resulted in a matrix that is not positive definite (smallest eigenvalue = ", smallest_eigen_value,
+      "Optimization of the R matrix resulted in a matrix that is not positive definite (smallest eigenvalue = ", round(smallest_eigen_value, 4),
       "). If this occurs only once, it may not be a concern. However, if it repeats, we recommend increasing the max_iter_R_outer and/or max_iter_R_inner parameters in pcglassoFast()."
     ))
 

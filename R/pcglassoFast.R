@@ -73,12 +73,16 @@ pcglassoFast <- function(
   if (verbose) {
     print(paste0("starting loss: ", round(loss_history, 4)))
   }
+
+  tol_D_curr <- 10
+  tol_R_curr <- 10
   while (!stop_loop && (length(loss_history)/2) < max_iter) {
     # D step
+    A <- R * S
     resD <- DOptim(
-      A = R * S,
+      A = A,
       d0 = D,
-      tol = tol_D,
+      tol = tol_D_curr,
       max_newton_iter = max_iter_D_newton,
       max_ls_steps = max_iter_D_ls,
       alpha = alpha, diagonal_Newton = diagonal_Newton
@@ -87,6 +91,15 @@ pcglassoFast <- function(
     if (verbose) {
       print(paste0("loss: ", round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
     }
+    if (length(loss_history) > 1) {
+      improvement_D <- proposed_loss - loss_history[length(loss_history)]
+      improvement_R <- loss_history[length(loss_history)] - loss_history[length(loss_history) - 1]
+
+      if (improvement_D < improvement_R * 2) {
+        tol_D_curr <- max(tol_D, tol_D_curr / 2)
+      }
+    }
+
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_D * 2)) {
       break
     }
@@ -94,19 +107,36 @@ pcglassoFast <- function(
     loss_history <- c(loss_history, proposed_loss)
 
     # R step
-    resR <- ROptim(
-      S = S * (D %o% D),
-      R = R,
-      Rinv = R_inv,
-      lambda = lambda,
-      tol = tol_R,
-      max_inner_iter = max_iter_R_inner,
-      max_outer_iter = max_iter_R_outer
-    )
-    proposed_loss <- function_to_optimize(resR$R, D, S, lambda, alpha)
-    if (verbose) {
-      print(paste0("loss: ", round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
+    R_curr <- R
+    R_inv_curr <- R_inv
+    S_for_Fortran <- S * (D %o% D)
+    repeat {
+      resR <- ROptim(
+        S = S_for_Fortran,
+        R = R_curr,
+        Rinv = R_inv_curr,
+        lambda = lambda,
+        tol = tol_R_curr,
+        max_inner_iter = max_iter_R_inner,
+        max_outer_iter = max_iter_R_outer
+      )
+      proposed_loss <- function_to_optimize(resR$R, D, S, lambda, alpha)
+      if (verbose) {
+        print(paste0("loss: ", round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
+      }
+      if (proposed_loss > loss_history[length(loss_history)] - (tol_R * 2)) {
+        break
+      }
+      if (tol_R_curr <= tol_R) {
+        # No improvements can be made here; stop the optimization process
+        break
+      }
+
+      tol_R_curr <- tol_R_curr / 2
+      R_curr <- resR$R
+      R_inv_curr <- resR$Rinv
     }
+
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_R * 2)) {
       if (verbose) {
         print("ending optimization as loss increased")
