@@ -91,7 +91,7 @@ pcglassoFast <- function(
       max_ls_steps = max_iter_D_ls,
       alpha = alpha, diagonal_Newton = diagonal_Newton
     )
-    full_time_D_optim <- full_time_D_optim + (proc.time() - start_time)
+    full_time_D_optim <- full_time_D_optim + (proc.time() - start_time)[["elapsed"]]
     proposed_loss <- function_to_optimize(R, resD$D, S, lambda, alpha)
     if (verbose) {
       print(paste0("loss: ", round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
