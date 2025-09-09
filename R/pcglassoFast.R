@@ -73,16 +73,12 @@ pcglassoFast <- function(
   if (verbose) {
     print(paste0("starting loss: ", round(loss_history, 4)))
   }
-  
-  start_time <- proc.time()
-  full_time_D_optim <- (proc.time() - start_time)[["elapsed"]]
-    
+
   tol_D_curr <- 10
   tol_R_curr <- 10
   while (!stop_loop && (length(loss_history)/2) < max_iter) {
     # D step
     A <- R * S
-    start_time <- proc.time()
     resD <- DOptim(
       A = A,
       d0 = D,
@@ -91,7 +87,6 @@ pcglassoFast <- function(
       max_ls_steps = max_iter_D_ls,
       alpha = alpha, diagonal_Newton = diagonal_Newton
     )
-    full_time_D_optim <- full_time_D_optim + (proc.time() - start_time)[["elapsed"]]
     proposed_loss <- function_to_optimize(R, resD$D, S, lambda, alpha)
     if (verbose) {
       print(paste0("loss: ", round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
@@ -174,8 +169,7 @@ pcglassoFast <- function(
     "D" = D,
     "R_inv" = R_inv,
     "n_iters" = floor(length(loss_history)/2),
-    "loss" = loss_history,
-    "full_time_D_optim" = full_time_D_optim
+    "loss" = loss_history
   )
 }
 
