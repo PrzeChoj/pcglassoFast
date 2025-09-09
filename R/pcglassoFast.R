@@ -54,7 +54,7 @@ pcglassoFast <- function(
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
     max_iter = 100, tolerance = 1e-6,
     tol_R = 1e-4,
-    max_iter_R_inner = 10, max_iter_R_outer = 100,
+    max_iter_R_inner = 500, max_iter_R_outer = 100,
     tol_D = 1e-4,
     max_iter_D_newton = 500, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
@@ -71,49 +71,76 @@ pcglassoFast <- function(
   stop_loop <- FALSE
   loss_history <- function_to_optimize(R, D, S, lambda, alpha)
   if (verbose) {
-    print(paste0(round(loss_history, 4), ", starting loss"))
+    print(paste0("starting loss: ", round(loss_history, 4)))
   }
-  start_time <- proc.time()
-  full_time_D_optim <- (proc.time() - start_time)[["elapsed"]]
+
+  tol_D_curr <- 10
+  tol_R_curr <- 10
   while (!stop_loop && (length(loss_history)/2) < max_iter) {
     # D step
-    start_time <- proc.time()
+    A <- R * S
     resD <- DOptim(
-      A = R * S,
+      A = A,
       d0 = D,
-      tol = tol_D,
+      tol = tol_D_curr,
       max_newton_iter = max_iter_D_newton,
       max_ls_steps = max_iter_D_ls,
       alpha = alpha, diagonal_Newton = diagonal_Newton
     )
-    full_time_D_optim <- full_time_D_optim + (proc.time() - start_time)[["elapsed"]]
     proposed_loss <- function_to_optimize(R, resD$D, S, lambda, alpha)
     if (verbose) {
-      print(paste0(round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
+      print(paste0("loss: ", round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
     }
+    if (length(loss_history) > 1) {
+      improvement_D <- proposed_loss - loss_history[length(loss_history)]
+      improvement_R <- loss_history[length(loss_history)] - loss_history[length(loss_history) - 1]
+
+      if (improvement_D < improvement_R * 2) {
+        tol_D_curr <- max(tol_D, tol_D_curr / 2)
+      }
+    }
+
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_D * 2)) {
-      rlang::warn("D optimization decreased the goal. We recommend to decrease the `tol_D` parameter.")
       break
     }
     D <- resD$D
     loss_history <- c(loss_history, proposed_loss)
 
     # R step
-    resR <- ROptim(
-      S = S * (D %o% D),
-      R = R,
-      Rinv = R_inv,
-      lambda = lambda,
-      tol = tol_R,
-      max_inner_iter = max_iter_R_inner,
-      max_outer_iter = max_iter_R_outer
-    )
-    proposed_loss <- function_to_optimize(resR$R, D, S, lambda, alpha)
-    if (verbose) {
-      print(paste0(round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
+    R_curr <- R
+    R_inv_curr <- R_inv
+    S_for_Fortran <- S * (D %o% D)
+    repeat {
+      resR <- ROptim(
+        S = S_for_Fortran,
+        R = R_curr,
+        Rinv = R_inv_curr,
+        lambda = lambda,
+        tol = tol_R_curr,
+        max_inner_iter = max_iter_R_inner,
+        max_outer_iter = max_iter_R_outer
+      )
+      proposed_loss <- function_to_optimize(resR$R, D, S, lambda, alpha)
+      if (verbose) {
+        print(paste0("loss: ", round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
+      }
+      if (proposed_loss > loss_history[length(loss_history)] - (tol_R * 2)) {
+        break
+      }
+      if (tol_R_curr <= tol_R) {
+        # No improvements can be made here; stop the optimization process
+        break
+      }
+
+      tol_R_curr <- tol_R_curr / 2
+      R_curr <- resR$R
+      R_inv_curr <- resR$Rinv
     }
+
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_R * 2)) {
-      rlang::warn("R optimization decreased the goal. We recommend to decrease the `tol_R` parameter.")
+      if (verbose) {
+        print("ending optimization as loss increased")
+      }
       break
     }
     R <- resR$R
@@ -122,6 +149,16 @@ pcglassoFast <- function(
 
     # loop
     stop_loop <- (loss_history[length(loss_history)] - loss_history[length(loss_history) - 2] < tolerance)
+    if (verbose && stop_loop) {
+      print(paste0(
+        "ending optimization as loss decreased by ",
+        loss_history[length(loss_history)] - loss_history[length(loss_history) - 2],
+        ", which is less than a tolerance (", tolerance, ")"))
+    }
+
+    if (verbose && (length(loss_history)/2) >= max_iter) {
+      print(paste0("ending optimization as number of iterations reached max_iter (", max_iter, ")"))
+    }
   }
 
   D <- as.vector(D)
@@ -132,8 +169,7 @@ pcglassoFast <- function(
     "D" = D,
     "R_inv" = R_inv,
     "n_iters" = floor(length(loss_history)/2),
-    "loss" = loss_history,
-    "full_time_D_optim" = full_time_D_optim
+    "loss" = loss_history
   )
 }
 

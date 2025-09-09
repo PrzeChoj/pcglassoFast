@@ -17,7 +17,7 @@ pcglassoPath(
   max_iter = 100,
   tolerance = 1e-06,
   tol_R = 0.001,
-  max_iter_R_inner = 10,
+  max_iter_R_inner = 500,
   max_iter_R_outer = 100,
   tol_D = 1e-04,
   max_iter_D_newton = 500,

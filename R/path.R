@@ -69,7 +69,7 @@ pcglassoPath <- function(
     max_iter = 100,
     tolerance = 1e-6,
     tol_R = 1e-3,
-    max_iter_R_inner = 10,
+    max_iter_R_inner = 500,
     max_iter_R_outer = 100,
     tol_D = 1e-4,
     max_iter_D_newton = 500,

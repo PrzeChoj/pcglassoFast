@@ -58,6 +58,7 @@ gradient_line_search <- function(
     # Line Search
     step_size <- find_step_size(A, alpha, d, step, prev_val, g, max_ls_steps)
     d <- d + step_size * step
+    curr_val <- f_d(d, A, alpha)
 
     iter <- iter + 1
   }
