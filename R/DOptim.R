@@ -2,7 +2,7 @@
 
 #' Optimze in D given R
 #'
-#' @param A symmetric matrix (p x p); A = R * S
+#' @param A symmetric matrix (p x p); A = C * R
 #' @param d0 initial vector (defaults to ones)
 #' @param tol convergence tolerance
 #' @param max_newton_iter max outer Newton iterations

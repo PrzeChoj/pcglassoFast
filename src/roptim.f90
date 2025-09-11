@@ -108,11 +108,19 @@ else
       X(i,i) = 0
    end do
 end if
+
 do iter = 1,maxIt
    dw = 0.0
    do j = 1,n
+      ! epsDelta
+      v = 0.0
+      do i = 1,n
+        v = max(v, W(i,i))
+      end do
+      if (v <= 0.0d0) stop 'diag(W) has nonpositive entry'
+      epsDelta = thrLasso / v / 10
+
       WXj(1:n) = 0.0
-!     We exploit sparsity of X when computing column j of W*X:
       do i = 1,n
          if (X(i,j) .ne. 0.0) then
             WXj = WXj + W(:,i)*X(i,j)
@@ -132,7 +140,7 @@ do iter = 1,maxIt
                   c = 0.0
                endif
                delta = c - X(i,j)
-               if (delta .ne. 0.0) then
+               if (abs(delta) .ge. dlx / 100) then
                   X(i,j) = c
                   WXj(1:n) = WXj(1:n) + W(:,i)*delta
                   dlx = max(dlx, abs(delta))
