@@ -15,7 +15,7 @@ DOptim(
 )
 }
 \arguments{
-\item{A}{symmetric matrix (p x p); A = C * R}
+\item{A}{symmetric matrix (p x p); A = C * R elementwise}
 
 \item{d0}{initial vector (defaults to ones)}
 

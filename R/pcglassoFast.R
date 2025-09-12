@@ -262,9 +262,11 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, times_tol_decrease, 
 #' In `ROptim()`, this function is maximized with respect to `R`.
 #' In `DOptim()`, this function is maximized with respect to `D`.
 #'
-#' \eqn{function\_to\_optimize(R, D) = log(det(R)) + (1-\alpha)log(det(D^2)) - tr(DCDR) - \lambda ||R||_1}
-#' function, where \eqn{||R||_1} is only for off-diagonal elements.
+#' \eqn{function\_to\_optimize(R, D) = log(det(R)) + (1-\alpha)log(det(D^2)) - tr(DCDR) - \lambda ||R||_{1,off}}
+#' function, where \eqn{||R||_{1,off}} is only for off-diagonal elements.
 function_to_optimize <- function(R, d, C, lambda, alpha) {
+  stopifnot(all(diag(C) == 1))
+
   my_norm_1 <- function(my_matrix) {
     diag(my_matrix) <- 0 # no diagonal elements
     sum(abs(my_matrix))
