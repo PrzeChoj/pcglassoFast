@@ -12,6 +12,7 @@ ROptim <- function(
   }
 
   p <- dim(R)[1]
+  stopifnot(p > 1)
   lambda_matrix <- matrix(lambda, p, p); diag(lambda_matrix) <- 0
   ans <- ROptim_to_fortran(
     S,
@@ -23,21 +24,9 @@ ROptim <- function(
     rlang::warn(paste0("Optimization of the R matrix reached the maximum number of iterations (", max_outer_iter, "). Consider increasing the max_iter_R_outer parameter in the pcglassoFast() function."))
   }
 
-  smallest_eigen_value <- eigen(ans$wi, TRUE, TRUE)$values[p]
-  if (smallest_eigen_value < 0) {
-    rlang::warn(paste0(
-      "Optimization of the R matrix resulted in a matrix that is not positive definite (smallest eigenvalue = ", round(smallest_eigen_value, 4),
-      "). If this occurs only once, it may not be a concern. However, if it repeats, we recommend increasing the max_iter_R_outer and/or max_iter_R_inner parameters in pcglassoFast()."
-    ))
-
-    desired_smallest_eigen_value <- 0.01
-    x <- (1-desired_smallest_eigen_value) / (1-smallest_eigen_value)
-    ans$wi <- x*ans$wi + diag(1-x, p)
-    ans$w <- solve(ans$wi)
-  }
-
   list(
     R           = ans$wi,
+    R_symetric  = (ans$wi + t(ans$wi)) / 2,
     Rinv        = ans$w,
     outer.count = ans$niter,
     loglik      = NA

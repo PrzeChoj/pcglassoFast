@@ -2,7 +2,7 @@
 
 #' Optimze in D given R
 #'
-#' @param A symmetric matrix (p x p); A = R * S
+#' @param A symmetric matrix (p x p); A = C * R
 #' @param d0 initial vector (defaults to ones)
 #' @param tol convergence tolerance
 #' @param max_newton_iter max outer Newton iterations
@@ -41,6 +41,9 @@ gradient_line_search <- function(
   iter <- 0
   prev_val <- -Inf
   curr_val <- f_d(d, A, alpha)
+  if (is.infinite(curr_val)) {
+    stop("The D optimization resulted in infinite values. This can happen e.g. when the R matrix has negative eigenvaule.")
+  }
   diagA <- Matrix::diag(A)
 
   while ((curr_val - prev_val) > tol && iter < max_iter) {
@@ -59,6 +62,9 @@ gradient_line_search <- function(
     step_size <- find_step_size(A, alpha, d, step, prev_val, g, max_ls_steps)
     d <- d + step_size * step
     curr_val <- f_d(d, A, alpha)
+    if (is.infinite(curr_val)) {
+      stop("The D optimization resulted in infinite values. This will happen when the R matrix has negative eigenvaule.")
+    }
 
     iter <- iter + 1
   }
