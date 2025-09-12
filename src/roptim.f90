@@ -104,7 +104,7 @@ if (warm .eq. 0) then
    enddo
 else
    do i = 1,n
-      X(1:n,i) = -X(1:n,i)/X(i,i)
+      X(1:n,i) = -X(1:n,i)
       X(i,i) = 0
    end do
 end if
@@ -112,14 +112,6 @@ end if
 do iter = 1,maxIt
    dw = 0.0
    do j = 1,n
-      ! epsDelta
-      v = 0.0
-      do i = 1,n
-        v = max(v, W(i,i))
-      end do
-      if (v <= 0.0d0) stop 'diag(W) has nonpositive entry'
-      epsDelta = thrLasso / v / 10
-
       WXj(1:n) = 0.0
       do i = 1,n
          if (X(i,j) .ne. 0.0) then
@@ -169,10 +161,6 @@ do i = 1,n
    X(1:n,i) = -X(1:n,i)
    X(i,i) = 1
 enddo
-do i = 1,n-1
-   X(i+1:n,i) = (X(i+1:n,i) + X(i,i+1:n))/2;
-   X(i,i+1:n) = X(i+1:n,i)
-enddo
-maxIt = iter
+maxIt = min(iter, maxIt)
 return
 end subroutine roptim

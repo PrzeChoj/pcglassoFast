@@ -53,9 +53,9 @@ pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
     max_iter = 100, tolerance = 1e-3,
-    tol_R = 1e-4,
-    max_iter_R_inner = 500, max_iter_R_outer = 100,
-    tol_D = 1e-4,
+    tol_R = 1e-8,
+    max_iter_R_inner = 50000, max_iter_R_outer = 10000,
+    tol_D = 1e-8,
     max_iter_D_newton = 500, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = FALSE) {
@@ -76,11 +76,29 @@ pcglassoFast <- function(
     print(paste0("starting loss: ", round(loss_history, 4)))
   }
 
-  tol_D_curr <- 10
-  tol_R_curr <- 1
+  tol_D_curr <- 0.1
+  tol_R_curr <- 0.1
+  times_tol_decrease <- 2
+
+  # R step, before loop
+  R_result <- R_step(C, D, lambda, alpha, R, R_inv, times_tol_decrease, tol_R_curr, tol_R, max_iter_R_inner, max_iter_R_outer, loss_history, verbose)
+  R_optimizaiton_improved_loss <- (R_result$proposed_loss - loss_history[length(loss_history)] > -2 * tolerance)
+  if (!R_optimizaiton_improved_loss) {
+    if (verbose) {
+      print("Ending optimization as loss worsen after the R optimizaiton.")
+    }
+    stop_loop <- TRUE
+  } else {
+    R <- R_result$R
+    R_symetric <- R_result$R_symetric
+    R_inv <- R_result$R_inv
+    loss_history <- c(loss_history, R_result$proposed_loss)
+    tol_R_curr <- R_result$tol_R_curr
+  }
+
   while (!stop_loop && (length(loss_history)/2) < max_iter) {
     # D step
-    A <- C * R
+    A <- C * R_symetric
     resD <- DOptim(
       A = A,
       d0 = D,
@@ -89,18 +107,21 @@ pcglassoFast <- function(
       max_ls_steps = max_iter_D_ls,
       alpha = alpha, diagonal_Newton = diagonal_Newton
     )
-    proposed_loss <- function_to_optimize(R, resD$D, C, lambda, alpha)
+    proposed_loss <- function_to_optimize(R_symetric, resD$D, C, lambda, alpha)
     if (verbose) {
       print(paste0("loss: ", round(proposed_loss, 4), ", after ", resD$iter, " iters of D optim"))
     }
-    if (length(loss_history) > 1) {
-      improvement_D <- proposed_loss - loss_history[length(loss_history)]
-      improvement_R <- loss_history[length(loss_history)] - loss_history[length(loss_history) - 1]
+    improvement_D <- proposed_loss - loss_history[length(loss_history)]
+    improvement_R <- loss_history[length(loss_history)] - loss_history[length(loss_history) - 1]
+    if (improvement_D < 0) {
+      stop("D optimization worsen the objective; this should not occur")
+    }
 
-      if (improvement_D < improvement_R * 2) {
-        tol_D_curr <- max(tol_D, tol_D_curr / 2)
+    if (improvement_D < improvement_R * 2) {
+      if (verbose & (tol_D < tol_D_curr)) {
         message(paste0("decrease tol_D_curr to ", tol_D_curr))
       }
+      tol_D_curr <- max(tol_D, tol_D_curr / times_tol_decrease)
     }
 
     if (proposed_loss <= loss_history[length(loss_history)] - (tol_D * 2)) {
@@ -110,86 +131,34 @@ pcglassoFast <- function(
     loss_history <- c(loss_history, proposed_loss)
 
     # R step
-    R_curr <- R
-    R_inv_curr <- R_inv
-    iterations_done <- 0
-    S_for_Fortran <- C * (D %o% D)
-    repeat {
+    R_result <- R_step(C, D, lambda, alpha, R, R_inv, times_tol_decrease, tol_R_curr, tol_R, max_iter_R_inner, max_iter_R_outer, loss_history[length(loss_history)], verbose)
+
+    R_optimizaiton_improved_loss <- (R_result$proposed_loss - loss_history[length(loss_history)] > -2 * tolerance)
+    if (!R_optimizaiton_improved_loss) {
+      stop_loop <- TRUE
       if (verbose) {
-        print("======================== Before R optimization ========================")
-        print(paste0("dual norm: ", determinant(R_inv_curr)$modulus - sum(diag(R_inv_curr))))
-        print(paste0("lambda = ", lambda, "; biggest err = ", max(abs(R_inv_curr - S_for_Fortran) - diag(diag(abs(R_inv_curr - S_for_Fortran))))))
-      }
-      resR <- ROptim(
-        S = S_for_Fortran,
-        R = R_curr,
-        Rinv = R_inv_curr,
-        lambda = lambda,
-        tol = tol_R_curr,
-        max_inner_iter = max_iter_R_inner,
-        max_outer_iter = max_iter_R_outer - iterations_done
-      )
-      if (any(is.nan(resR$Rinv)) | any(is.nan(resR$R))) {
-        warn("NaNs introduced in Fortran calculations")
-        # TODO: Return with code error
-        return()
-      }
-      if (verbose) {
-        print("======================== After R optimization ========================")
-        print(paste0("dual norm: ", determinant(resR$Rinv)$modulus - sum(diag(resR$Rinv))))
-        print(paste0("lambda = ", lambda, "; biggest err = ", max(abs(resR$Rinv - S_for_Fortran) - diag(diag(abs(resR$Rinv - S_for_Fortran))))))
-      }
-      iterations_done <- iterations_done + resR$outer.count
-      proposed_loss <- function_to_optimize(resR$R, D, C, lambda, alpha)
-      if (verbose) {
-        print(paste0("loss: ", round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
-      }
-
-      used_all_iterations <- (iterations_done >= max_iter_R_outer)
-      tolerance_cannot_be_smaller <- (tol_R_curr <= tol_R)
-      loss_is_better <- (proposed_loss > loss_history[length(loss_history)] - (tol_R * 2))
-      dual_constraint_satisfied <- {
-        error_matrix <- resR$Rinv - S_for_Fortran
-        diag(error_matrix) <- 0 # dual constraint involve only off-diagonal
-        max(abs(error_matrix)) <= lambda * 1.1 # 0.1 for approximate satisfaction
-      }
-
-      if (used_all_iterations | tolerance_cannot_be_smaller) {
-        # no improvement can be made
-        break
-      }
-
-      if (loss_is_better & dual_constraint_satisfied) {
-        # no improvement is needed, we've converged
-        break
-      }
-
-      tol_R_curr <- max(tol_R_curr / 2, tol_R)
-      message(paste0("decrease tol_R_curr to ", tol_R_curr))
-      R_curr <- resR$R
-      R_inv_curr <- resR$Rinv
-    }
-
-    if (proposed_loss <= loss_history[length(loss_history)] - (tol_R * 2)) {
-      if (verbose) {
-        print("ending optimization as loss increased")
+        print("Ending optimization as loss worsen after the R optimizaiton.")
       }
       break
     }
-    R <- resR$R
-    R_inv <- resR$Rinv
-    loss_history <- c(loss_history, proposed_loss)
+    R <- R_result$R
+    R_symetric <- R_result$R_symetric
+    R_inv <- R_result$R_inv
+    loss_history <- c(loss_history, R_result$proposed_loss)
+    tol_R_curr <- R_result$tol_R_curr
 
     # loop
     stop_loop <- (loss_history[length(loss_history)] - loss_history[length(loss_history) - 2] < tolerance)
     if (verbose && stop_loop) {
-      print(paste0("ending optimization as loss decreased less than a tolerance (", tolerance, ")"))
+      print(paste0("ending optimization as loss improved less than a tolerance (", tolerance, ")"))
     }
 
     if (verbose && (length(loss_history)/2) >= max_iter) {
       print(paste0("ending optimization as number of iterations reached max_iter (", max_iter, ")"))
     }
   }
+
+  R <- (R + t(R))/2
 
   D <- as.vector(D)
   list(
@@ -200,6 +169,90 @@ pcglassoFast <- function(
     "R_inv" = R_inv,
     "n_iters" = floor(length(loss_history)/2),
     "loss" = loss_history
+  )
+}
+
+R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, times_tol_decrease, tol_R_curr, tol_R, max_iter_R_inner, max_iter_R_outer, prev_loss, verbose) {
+  p <- dim(C)[1]
+  S_for_Fortran <- C * (D %o% D)
+  iterations_done <- 0
+  repeat {
+    if (verbose) {
+      print("======================== Before R optimization ========================")
+      print(paste0("tol_R_curr = ", tol_R_curr))
+      print(paste0("dual objective: ", round(determinant(R_inv_curr)$modulus - sum(diag(R_inv_curr)), 3)))
+      print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(R_inv_curr - S_for_Fortran) - diag(diag(abs(R_inv_curr - S_for_Fortran)))), 3)))
+    }
+    resR <- ROptim(
+      S = S_for_Fortran,
+      R = R_curr,
+      Rinv = R_inv_curr,
+      lambda = lambda,
+      tol = tol_R_curr,
+      max_inner_iter = max_iter_R_inner,
+      max_outer_iter = max_iter_R_outer - iterations_done
+    )
+    if (any(is.nan(resR$Rinv)) | any(is.nan(resR$R))) {
+      warn("NaNs introduced in Fortran calculations")
+      # TODO: Return with code error
+      return()
+    }
+    if (verbose) {
+      print("======================== After R optimization ========================")
+      print(paste0("dual objective: ", round(determinant(resR$Rinv)$modulus - sum(diag(resR$Rinv)), 3)))
+      print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(resR$Rinv - S_for_Fortran) - diag(diag(abs(resR$Rinv - S_for_Fortran)))), 3)))
+    }
+    iterations_done <- iterations_done + resR$outer.count
+    proposed_loss <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+    if (verbose) {
+      print(paste0("loss: ", round(proposed_loss, 4), ", after ", resR$outer.count, " iters of R optim"))
+    }
+
+    used_all_iterations <- (iterations_done >= max_iter_R_outer)
+    tolerance_cannot_be_smaller <- (tol_R_curr <= tol_R)
+    loss_is_better <- (proposed_loss > prev_loss - (tol_R * 2))
+    dual_constraint_satisfied <- {
+      error_matrix <- resR$Rinv - S_for_Fortran
+      diag(error_matrix) <- 0 # dual constraint involve only off-diagonal
+      max(abs(error_matrix)) <= lambda * 1.1 # 1.1 for approximate satisfaction
+    }
+    smallest_eigen_value <- eigen(resR$R_symetric, TRUE, TRUE)$values[p]
+    R_positive_definite <- (smallest_eigen_value > 0)
+
+    if (used_all_iterations | tolerance_cannot_be_smaller) {
+      # no improvement can be made
+      if (!R_positive_definite) {
+        # fix R to be positive definite
+        # TODO: Warning
+        desired_smallest_eigen_value <- 0.01
+        x <- (1-desired_smallest_eigen_value) / (1-smallest_eigen_value)
+        resR$R_symetric <- x*resR$R_symetric + diag(1-x, p)
+        resR$Rinv <- solve(resR$R_symetric)
+
+        proposed_loss <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+      }
+      break
+    }
+
+    if (R_positive_definite & loss_is_better & dual_constraint_satisfied) {
+      # no improvement is needed, we've converged
+      break
+    }
+
+    if (verbose & (tol_R < tol_R_curr)){
+      message(paste0("decrease tol_R_curr to ", tol_R_curr))
+    }
+    tol_R_curr <- max(tol_R_curr / times_tol_decrease, tol_R)
+    R_curr <- resR$R
+    R_inv_curr <- resR$Rinv
+  }
+
+  list(
+    R = resR$R,
+    R_symetric = resR$R_symetric,
+    R_inv = resR$Rinv,
+    proposed_loss = proposed_loss,
+    tol_R_curr = tol_R_curr
   )
 }
 
