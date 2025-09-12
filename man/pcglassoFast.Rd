@@ -12,11 +12,11 @@ pcglassoFast(
   R_inv = solve(R),
   D = rep(1, dim(S)[1]),
   max_iter = 100,
-  tolerance = 1e-06,
-  tol_R = 1e-04,
-  max_iter_R_inner = 500,
-  max_iter_R_outer = 100,
-  tol_D = 1e-04,
+  tolerance = 0.001,
+  tol_R = 1e-08,
+  max_iter_R_inner = 50000,
+  max_iter_R_outer = 10000,
+  tol_D = 1e-08,
   max_iter_D_newton = 500,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
@@ -82,7 +82,7 @@ S <- solve(S_inv.true) # data
 
 alpha <- 4 / 20 # 4 / n, as in Carter's paper
 
-pcglassoFast(S, 0.11, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = TRUE)
+pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = TRUE)
 }
 \seealso{
 \code{\link[=pcglassoPath]{pcglassoPath()}} to compute a full λ‑path of solutions
