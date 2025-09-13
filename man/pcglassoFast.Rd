@@ -20,7 +20,7 @@ pcglassoFast(
   max_iter_D_newton = 500,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
-  verbose = FALSE
+  verbose = 0
 )
 }
 \arguments{
@@ -47,7 +47,14 @@ matrix (it is recommended to left it default).}
 
 \item{tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=DOptim]{DOptim()}} function.}
 
-\item{verbose}{(boolian) print information about optimization process.}
+\item{verbose}{(integer) print information about optimization process.
+\itemize{
+\item 0 -> no printing
+\item 1 -> information about why the optimization has ended
+\item 2 -> information about objective improvmenet
+\item 3 -> information about tolerance adaptation
+\item 4 -> details about the R matrix optimization
+}}
 }
 \value{
 list of three elements:
@@ -82,7 +89,7 @@ S <- solve(S_inv.true) # data
 
 alpha <- 4 / 20 # 4 / n, as in Carter's paper
 
-pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = TRUE)
+pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 1)
 }
 \seealso{
 \code{\link[=pcglassoPath]{pcglassoPath()}} to compute a full λ‑path of solutions

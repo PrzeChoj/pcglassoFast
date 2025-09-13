@@ -49,7 +49,7 @@
 #' resPath <- pcglassoPath(
 #'   S, alpha,
 #'   nlambda = 10,
-#'   verbose = TRUE
+#'   verbose = 1
 #' )
 #' resPath
 pcglassoPath <- function(
@@ -73,7 +73,7 @@ pcglassoPath <- function(
     max_iter_D_newton = 500,
     max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
-    verbose = FALSE) {
+    verbose = 0) {
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
@@ -84,8 +84,10 @@ pcglassoPath <- function(
     is.null(lambdas) || is.numeric(lambdas),
     min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
     max_edge_fraction >= 0 && max_edge_fraction <= 1,
-    length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton)
+    length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton),
+    verbose %in% 0:4 # can be TRUE (1) or FALSE (0)
   )
+  path_time_start <- Sys.time()
 
   p <- nrow(S)
   if (is.null(R0_inv)) R0_inv <- solve(R0)
@@ -108,10 +110,10 @@ pcglassoPath <- function(
   D_curr <- D0
 
   for (k in 1:K) {
-    if (verbose) {
-      message(paste0("Path iteration: ", k, " of ", K))
-    }
     lambda_k <- lambdas[k]
+    if (verbose != 0) {
+      message(paste0("Path iteration: ", k, " of ", K, "; lambda = ", round(lambda_k, 3)))
+    }
 
     # run full blockwise optimization at this lambda
     fit <- pcglassoFast(
@@ -152,6 +154,12 @@ pcglassoPath <- function(
     if (edge_frac > max_edge_fraction) {
       break
     }
+  }
+
+  path_time_end <- Sys.time()
+  path_time_full <- path_time_end - path_time_start
+  if (verbose >= 1) {
+    print(paste0("Path took ", round(path_time_full, 3), " ", attr(path_time_full, "units")))
   }
 
   # trim to actual length

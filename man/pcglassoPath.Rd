@@ -23,7 +23,7 @@ pcglassoPath(
   max_iter_D_newton = 500,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
-  verbose = FALSE
+  verbose = 0
 )
 }
 \arguments{
@@ -79,7 +79,7 @@ alpha <- 4 / 20
 resPath <- pcglassoPath(
   S, alpha,
   nlambda = 10,
-  verbose = TRUE
+  verbose = 1
 )
 resPath
 }
