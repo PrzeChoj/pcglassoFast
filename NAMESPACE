@@ -2,7 +2,7 @@
 
 export(compare_matrices)
 export(cov2cor_inv)
-export(evaluate_loss_path)
+export(evaluate_objective_path)
 export(irrepGLASSO)
 export(irrepPCGLASSO)
 export(pcglassoFast)

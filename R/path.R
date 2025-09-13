@@ -29,7 +29,7 @@
 #'   \item{\code{R_path}}{List of estimated correlation matrices \eqn{R}.}
 #'   \item{\code{D_path}}{List of estimated diagonal matrices \eqn{D}.}
 #'   \item{\code{W_path}}{List of full covariance estimates \eqn{D\,R\,D}.}
-#'   \item{\code{loss}}{Numeric vector of final objective values at each \eqn{\lambda}.}
+#'   \item{\code{objective}}{Numeric vector of final objective values at each \eqn{\lambda}.}
 #' }
 #'
 #' @seealso \code{\link{pcglassoFast}} for a single‑lambda blockwise optimizer.
@@ -48,9 +48,7 @@
 #' # get a small path of 20 lambdas but stop when >40% edges
 #' resPath <- pcglassoPath(
 #'   S, alpha,
-#'   nlambda = 20,
-#'   min_lambda_ratio = 0.01,
-#'   max_edge_fraction = 0.4,
+#'   nlambda = 10,
 #'   verbose = TRUE
 #' )
 #' resPath
@@ -102,7 +100,7 @@ pcglassoPath <- function(
   # prepare storage
   K <- length(lambdas)
   outW <- outWi <- outD <- outR <- outRi <- vector("list", K)
-  losses <- iters <- numeric(K)
+  objective_values <- iters <- numeric(K)
 
   # warm start
   R_curr <- R0
@@ -111,7 +109,7 @@ pcglassoPath <- function(
 
   for (k in 1:K) {
     if (verbose) {
-      print(paste0("Path iteration: ", k))
+      message(paste0("Path iteration: ", k, " of ", K))
     }
     lambda_k <- lambdas[k]
 
@@ -147,7 +145,7 @@ pcglassoPath <- function(
     outW[[k]] <- R_curr * (D_curr %o% D_curr)
     outWi[[k]] <- Rinv_curr * ((1/D_curr) %o% (1/D_curr))
     iters[k] <- fit$n_iters
-    losses[k] <- utils::tail(fit$loss, 1)
+    objective_values[k] <- utils::tail(fit$objective, 1)
 
     # compute edge fraction and early stop
     edge_frac <- (sum(R_curr != 0) - p) / (p * (p - 1))
@@ -164,7 +162,7 @@ pcglassoPath <- function(
   outD <- outD[used]
   outW <- outW[used]
   outWi <- outWi[used]
-  losses <- losses[used]
+  objective_values <- objective_values[used]
   iters <- iters[used]
 
   names(outR) <- names(outD) <- names(outW) <- paste0("lam_", round(lambdas, 4))
@@ -175,16 +173,16 @@ pcglassoPath <- function(
     D_path = outD,
     W_path = outW,
     Wi_path = outWi,
-    loss = losses,
+    objective = objective_values,
     iters = iters
   )
 }
 
 
-#' Loss evaluation
+#' Objective function evaluation
 #'
 #' @description
-#' computes the loss for the solution of the pcglassoPath, or a list or an array of
+#' computes the objective for the solution of the pcglassoPath, or a list or an array of
 #' matrices
 #' the BIC_gamma is from Extended Bayesian Information Criteria for Gaussian
 #' Graphical Models
@@ -199,7 +197,7 @@ pcglassoPath <- function(
 #'
 #' @importFrom methods is
 #' @export
-evaluate_loss_path <- function(precision_array, Sigma, n, gamma = 0.5) {
+evaluate_objective_path <- function(precision_array, Sigma, n, gamma = 0.5) {
   if ("list" %in% methods::is(precision_array)) {
     W <- precision_array$W_path
     precision_array <- simplify2array(W)

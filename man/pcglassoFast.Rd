@@ -47,7 +47,7 @@ matrix (it is recommended to left it default).}
 
 \item{tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=DOptim]{DOptim()}} function.}
 
-\item{verbose}{(boolian) print of loss.}
+\item{verbose}{(boolian) print information about optimization process.}
 }
 \value{
 list of three elements:

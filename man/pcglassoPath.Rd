@@ -55,7 +55,7 @@ A list with components:
 \item{\code{R_path}}{List of estimated correlation matrices \eqn{R}.}
 \item{\code{D_path}}{List of estimated diagonal matrices \eqn{D}.}
 \item{\code{W_path}}{List of full covariance estimates \eqn{D\,R\,D}.}
-\item{\code{loss}}{Numeric vector of final objective values at each \eqn{\lambda}.}
+\item{\code{objective}}{Numeric vector of final objective values at each \eqn{\lambda}.}
 }
 }
 \description{
@@ -78,9 +78,7 @@ alpha <- 4 / 20
 # get a small path of 20 lambdas but stop when >40\% edges
 resPath <- pcglassoPath(
   S, alpha,
-  nlambda = 20,
-  min_lambda_ratio = 0.01,
-  max_edge_fraction = 0.4,
+  nlambda = 10,
   verbose = TRUE
 )
 resPath
