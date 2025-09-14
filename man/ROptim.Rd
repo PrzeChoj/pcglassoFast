@@ -4,15 +4,7 @@
 \alias{ROptim}
 \title{Optimize in R given D}
 \usage{
-ROptim(
-  S,
-  R,
-  Rinv,
-  lambda,
-  tol = 1e-04,
-  max_inner_iter = 10,
-  max_outer_iter = 100
-)
+ROptim(S, R, Rinv, lambda, tol = 1e-04, max_outer_iter = 100)
 }
 \description{
 Optimize in R given D

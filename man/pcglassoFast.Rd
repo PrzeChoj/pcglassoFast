@@ -11,13 +11,13 @@ pcglassoFast(
   R = diag(dim(S)[1]),
   R_inv = solve(R),
   D = rep(1, dim(S)[1]),
-  max_iter = 100,
+  max_iter = 1000,
   tolerance = 0.001,
   tol_R = 1e-08,
-  max_iter_R_inner = 50000,
-  max_iter_R_outer = 10000,
+  max_iter_R = 500,
+  max_iter_R_outer = 5e+05,
   tol_D = 1e-08,
-  max_iter_D_newton = 500,
+  max_iter_D_newton = 5000,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
   verbose = 0
@@ -43,7 +43,7 @@ matrix (it is recommended to left it default).}
 
 \item{tolerance}{(double) tolerance for convergence.}
 
-\item{tol_R, max_iter_R_inner, max_iter_R_outer}{Parameters passed to \code{\link[=ROptim]{ROptim()}} function.}
+\item{tol_R, max_iter_R_outer}{Parameters passed to \code{\link[=ROptim]{ROptim()}} function.}
 
 \item{tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=DOptim]{DOptim()}} function.}
 
@@ -52,8 +52,9 @@ matrix (it is recommended to left it default).}
 \item 0 -> no printing
 \item 1 -> information about why the optimization has ended
 \item 2 -> information about objective improvmenet
-\item 3 -> information about tolerance adaptation
-\item 4 -> details about the R matrix optimization
+\item 3 -> information about tolerance adaptation for D optimization
+\item 4 -> information about tolerance adaptation for R optimization
+\item 5 -> details about the R matrix optimization
 }}
 }
 \value{
@@ -89,7 +90,7 @@ S <- solve(S_inv.true) # data
 
 alpha <- 4 / 20 # 4 / n, as in Carter's paper
 
-pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 1)
+pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 3)
 }
 \seealso{
 \code{\link[=pcglassoPath]{pcglassoPath()}} to compute a full λ‑path of solutions
