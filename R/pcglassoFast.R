@@ -53,15 +53,15 @@
 #'
 #' alpha <- 4 / 20 # 4 / n, as in Carter's paper
 #'
-#' pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 1)
+#' pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 2)
 pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
-    max_iter = 100, tolerance = 1e-3,
+    max_iter = 1000, tolerance = 1e-3,
     tol_R = 1e-8,
-    max_iter_R_inner = 50000, max_iter_R_outer = 10000,
+    max_iter_R = 500, max_iter_R_inner = max_iter_R_outer * nrow(S), max_iter_R_outer = 500000,
     tol_D = 1e-8,
-    max_iter_D_newton = 500, max_iter_D_ls = 100,
+    max_iter_D_newton = 2000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = 0) {
   stopifnot(
@@ -76,19 +76,19 @@ pcglassoFast <- function(
   )
   C <- cov2cor(S)
   strating_time <- Sys.time()
+  digits_to_print <- max(0, -floor(log10(tolerance)))
 
   stop_loop <- FALSE
   objective_history <- function_to_optimize(R, D, C, lambda, alpha)
   if (verbose >= 2) {
-    print(paste0("starting objective: ", round(objective_history, 4)))
+    print(paste0("Iteration 0. objective: ", round(objective_history, digits_to_print)))
   }
 
   tol_D_curr <- 0.1
-  tol_R_curr <- 0.1
   times_tol_decrease <- 2
 
   # R step, before loop
-  R_result <- R_step(C, D, lambda, alpha, R, R_inv, times_tol_decrease, tol_R_curr, tol_R, max_iter_R_inner, max_iter_R_outer, objective_history, verbose)
+  R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_inner, max_iter_R_outer, objective_history, verbose, 0)
   R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
   if (!R_optimizaiton_improved_objective) {
     if (verbose >= 1) {
@@ -100,7 +100,6 @@ pcglassoFast <- function(
     R_symetric <- R_result$R_symetric
     R_inv <- R_result$R_inv
     objective_history <- c(objective_history, R_result$proposed_objective)
-    tol_R_curr <- R_result$tol_R_curr
   }
 
   while (!stop_loop && (length(objective_history)/2) < max_iter) {
@@ -119,7 +118,7 @@ pcglassoFast <- function(
     )
     proposed_objective <- function_to_optimize(R_symetric, resD$D, C, lambda, alpha)
     if (verbose >= 2) {
-      print(paste0("objective: ", round(proposed_objective, 4), ", after ", resD$iter, " iters of D optim"))
+      print(paste0("Iteration ", length(objective_history)/2, ". Objective: ", round(proposed_objective, digits_to_print), ", after ", resD$iter, " iters of D optim"))
     }
     improvement_D <- proposed_objective - objective_history[length(objective_history)]
     improvement_R <- objective_history[length(objective_history)] - objective_history[length(objective_history) - 1]
@@ -141,7 +140,7 @@ pcglassoFast <- function(
     objective_history <- c(objective_history, proposed_objective)
 
     # R step
-    R_result <- R_step(C, D, lambda, alpha, R, R_inv, times_tol_decrease, tol_R_curr, tol_R, max_iter_R_inner, max_iter_R_outer, objective_history[length(objective_history)], verbose)
+    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_inner, max_iter_R_outer, objective_history[length(objective_history)], verbose, (length(objective_history) - 1)/2)
 
     R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
     if (!R_optimizaiton_improved_objective) {
@@ -155,7 +154,6 @@ pcglassoFast <- function(
     R_symetric <- R_result$R_symetric
     R_inv <- R_result$R_inv
     objective_history <- c(objective_history, R_result$proposed_objective)
-    tol_R_curr <- R_result$tol_R_curr
 
     # loop
     stop_loop <- (objective_history[length(objective_history)] - objective_history[length(objective_history) - 2] < tolerance)
@@ -188,16 +186,23 @@ pcglassoFast <- function(
   )
 }
 
-R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, times_tol_decrease, tol_R_curr, tol_R, max_iter_R_inner, max_iter_R_outer, prev_objective, verbose) {
+R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_decrease, tol_R, max_iter_R, max_iter_R_inner, max_iter_R_outer, prev_objective, verbose, iteration_number) {
+  digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
   p <- dim(C)[1]
+  tol_R_curr <- 0.1
+  max_iter_R_outer_curr <- 100
+  max_iter_R_inner <- max_iter_R_outer_curr * p
+
   S_for_Fortran <- C * (D %o% D)
-  iterations_done <- 0
+  iterations_in_R_done <- -1
+  iterations_in_Fortran_done <- 0
   repeat {
+    iterations_in_R_done <- iterations_in_R_done + 1
     if (verbose >= 4) {
       print("=== R step ===")
       print(paste0("tol_R_curr = ", tol_R_curr))
-      print(paste0("dual objective: ", round(determinant(R_inv_curr)$modulus - sum(diag(R_inv_curr)), 3)))
-      print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(R_inv_curr - S_for_Fortran) - diag(diag(abs(R_inv_curr - S_for_Fortran)))), 3)))
+      print(paste0("dual objective: ", round(determinant(R_inv_curr)$modulus - sum(diag(R_inv_curr)), digits_to_print)))
+      print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(R_inv_curr - S_for_Fortran) - diag(diag(abs(R_inv_curr - S_for_Fortran)))), digits_to_print)))
     }
     resR <- ROptim(
       S = S_for_Fortran,
@@ -206,37 +211,56 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, times_tol_decrease, 
       lambda = lambda,
       tol = tol_R_curr,
       max_inner_iter = max_iter_R_inner,
-      max_outer_iter = max_iter_R_outer - iterations_done
+      max_outer_iter = max_iter_R_outer_curr
     )
     if (any(is.nan(resR$Rinv)) | any(is.nan(resR$R))) {
       warn("NaNs introduced in Fortran calculations")
       # TODO: Return with code error
       return()
     }
+    iterations_in_Fortran_done <- iterations_in_Fortran_done + resR$outer.count
     if (verbose >= 4) {
       print("=== After R step ===")
-      print(paste0("dual objective: ", round(determinant(resR$Rinv)$modulus - sum(diag(resR$Rinv)), 3)))
-      print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(resR$Rinv - S_for_Fortran) - diag(diag(abs(resR$Rinv - S_for_Fortran)))), 3)))
+      print(paste0("dual objective: ", round(determinant(resR$Rinv)$modulus - sum(diag(resR$Rinv)), digits_to_print)))
+      print(paste0("lambda = ", round(lambda, digits_to_print), "; biggest err = ", round(max(abs(resR$Rinv - S_for_Fortran) - diag(diag(abs(resR$Rinv - S_for_Fortran)))), digits_to_print)))
     }
-    iterations_done <- iterations_done + resR$outer.count
     proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
-    if (verbose >= 2) {
-      print(paste0("objective: ", round(proposed_objective, 4), ", after ", resR$outer.count, " iters of R optim"))
-    }
 
-    used_all_iterations <- (iterations_done >= max_iter_R_outer)
-    tolerance_cannot_be_smaller <- (tol_R_curr <= tol_R)
-    objective_is_better <- (proposed_objective > prev_objective - (tol_R * 2))
-    dual_constraint_satisfied <- {
-      error_matrix <- resR$Rinv - S_for_Fortran
-      diag(error_matrix) <- 0 # dual constraint involve only off-diagonal
-      max(abs(error_matrix)) <= lambda * 1.1 # 1.1 for approximate satisfaction
-    }
     smallest_eigen_value <- eigen(resR$R_symetric, TRUE, TRUE)$values[p]
     R_positive_definite <- (smallest_eigen_value > 0)
+    dual_constraint_error <- {
+      error_matrix <- resR$Rinv - S_for_Fortran
+      diag(error_matrix) <- 0 # dual constraint involve only off-diagonal
+      max(abs(error_matrix))
+    }
+    dual_constraint_satisfied <- (dual_constraint_error <= lambda * 1.1) # 1.1 for approximate satisfaction
+    objective_is_better <- (proposed_objective > prev_objective - (tolerance_full_optimization * 2))
 
-    if (used_all_iterations | tolerance_cannot_be_smaller) {
+    if (R_positive_definite & dual_constraint_satisfied & objective_is_better) {
+      # no improvement is needed, we've converged
+      if (verbose >= 2) {
+        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ", after ", iterations_in_Fortran_done, " iters of R optim"))
+      }
+      break
+    }
+
+    if (verbose >= 3) {
+      print(paste0(
+        "Continue R optimization as ",
+        if (!R_positive_definite) {
+          paste0("R matrix was not positive definite (eigen value ", round(smallest_eigen_value, digits_to_print), ")")
+        } else if (!dual_constraint_satisfied) {
+          paste0("dual constraint was not satisfied (dual error ", round(dual_constraint_error, digits_to_print), " vs lambda = ", round(lambda, digits_to_print), ")")
+        } else {
+          paste0("objective has not yet improved (objective = ", round(proposed_objective, digits_to_print), " prev objective = ", round(prev_objective, digits_to_print), ")")
+        }))
+    }
+
+    if (iterations_in_R_done >= max_iter_R) {
       # no improvement can be made
+      if (verbose >= 2) {
+        print("TODO: end R optim")
+      }
       if (!R_positive_definite) {
         # fix R to be positive definite
         # TODO: Warning
@@ -251,19 +275,18 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, times_tol_decrease, 
       break
     }
 
-    if (R_positive_definite & objective_is_better & dual_constraint_satisfied) {
-      # no improvement is needed, we've converged
-      break
-    }
-
-    tol_R_curr <- max(tol_R_curr / times_tol_decrease, tol_R)
-    if ((verbose >= 3) & (tol_R < tol_R_curr)){
-      message(paste0(
-        "Decreasing tol_R_curr to ", tol_R_curr, " as ",
-        if(!dual_constraint_satisfied) {"dual constraint were not satisfied yet"}
-        else if (!objective_is_better) {"objective did not improve yet"}
-        else {"R matrix was not positive definite"}
-      ))
+    if (resR$outer.count < max_iter_R_outer) {
+      new_tol_R_curr <- max(tol_R_curr / times_tol_decrease, tol_R)
+      if ((verbose >= 3) & (new_tol_R_curr < tol_R_curr)){
+        print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
+      }
+      tol_R_curr <- new_tol_R_curr
+    } else {
+      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer)
+      if ((verbose >= 3) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)){
+        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
+      }
+      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
     }
     R_curr <- resR$R
     R_inv_curr <- resR$Rinv
@@ -273,8 +296,7 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, times_tol_decrease, 
     R = resR$R,
     R_symetric = resR$R_symetric,
     R_inv = resR$Rinv,
-    proposed_objective = proposed_objective,
-    tol_R_curr = tol_R_curr
+    proposed_objective = proposed_objective
   )
 }
 
