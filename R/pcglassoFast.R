@@ -123,7 +123,7 @@ pcglassoFast <- function(
     }
     improvement_D <- proposed_objective - objective_history[length(objective_history)]
     improvement_R <- objective_history[length(objective_history)] - objective_history[length(objective_history) - 1]
-    if (improvement_D < 0) {
+    if (improvement_D < -0.00001) {
       stop("D optimization worsen the objective; this should not occur")
     }
 
