@@ -11,7 +11,7 @@
 #'         matrix (it is recommended to left it default).
 #' @param max_iter (integer) maximum number of iterations.
 #' @param tolerance (double) tolerance for convergence.
-#' @param tol_R,max_iter_R_inner,max_iter_R_outer
+#' @param tol_R,max_iter_R_outer
 #'         Parameters passed to [ROptim()] function.
 #' @param tol_D,max_iter_D_newton,max_iter_D_ls
 #'         Parameters passed to [DOptim()] function.
@@ -19,8 +19,9 @@
 #'   * 0 -> no printing
 #'   * 1 -> information about why the optimization has ended
 #'   * 2 -> information about objective improvmenet
-#'   * 3 -> information about tolerance adaptation
-#'   * 4 -> details about the R matrix optimization
+#'   * 3 -> information about tolerance adaptation for D optimization
+#'   * 4 -> information about tolerance adaptation for R optimization
+#'   * 5 -> details about the R matrix optimization
 #'
 #' @details
 #' The function maximizes the
@@ -53,15 +54,15 @@
 #'
 #' alpha <- 4 / 20 # 4 / n, as in Carter's paper
 #'
-#' pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 2)
+#' pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 3)
 pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
     max_iter = 1000, tolerance = 1e-3,
     tol_R = 1e-8,
-    max_iter_R = 500, max_iter_R_inner = max_iter_R_outer * nrow(S), max_iter_R_outer = 500000,
+    max_iter_R = 500, max_iter_R_outer = 500000,
     tol_D = 1e-8,
-    max_iter_D_newton = 2000, max_iter_D_ls = 100,
+    max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = 0) {
   stopifnot(
@@ -88,7 +89,7 @@ pcglassoFast <- function(
   times_tol_decrease <- 2
 
   # R step, before loop
-  R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_inner, max_iter_R_outer, objective_history, verbose, 0)
+  R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, 0)
   R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
   if (!R_optimizaiton_improved_objective) {
     if (verbose >= 1) {
@@ -104,7 +105,7 @@ pcglassoFast <- function(
 
   while (!stop_loop && (length(objective_history)/2) < max_iter) {
     # D step
-    if (verbose >= 4) {
+    if (verbose >= 5) {
       print("=== D step ===")
     }
     A <- C * R_symetric
@@ -122,15 +123,16 @@ pcglassoFast <- function(
     }
     improvement_D <- proposed_objective - objective_history[length(objective_history)]
     improvement_R <- objective_history[length(objective_history)] - objective_history[length(objective_history) - 1]
-    if (improvement_D < -0.00001) {
+    if (improvement_D < -tolerance * 0.1) {
       stop("D optimization worsen the objective; this should not occur")
     }
 
     if (improvement_D < improvement_R * 2) {
+      new_tol_D_curr <- max(tol_D, tol_D_curr / times_tol_decrease)
       if ((verbose >= 3) & (tol_D < tol_D_curr)) {
-        message(paste0("Decreasing tol_D_curr to ", tol_D_curr))
+        message(paste0("Decreasing tol_D_curr to ", new_tol_D_curr))
       }
-      tol_D_curr <- max(tol_D, tol_D_curr / times_tol_decrease)
+      tol_D_curr <- new_tol_D_curr
     }
 
     if (proposed_objective <= objective_history[length(objective_history)] - (tol_D * 2)) {
@@ -140,7 +142,7 @@ pcglassoFast <- function(
     objective_history <- c(objective_history, proposed_objective)
 
     # R step
-    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_inner, max_iter_R_outer, objective_history[length(objective_history)], verbose, (length(objective_history) - 1)/2)
+    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, (length(objective_history) - 1)/2)
 
     R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
     if (!R_optimizaiton_improved_objective) {
@@ -186,19 +188,18 @@ pcglassoFast <- function(
   )
 }
 
-R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_decrease, tol_R, max_iter_R, max_iter_R_inner, max_iter_R_outer, prev_objective, verbose, iteration_number) {
+R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
   p <- dim(C)[1]
   tol_R_curr <- 0.1
   max_iter_R_outer_curr <- 100
-  max_iter_R_inner <- max_iter_R_outer_curr * p
 
   S_for_Fortran <- C * (D %o% D)
   iterations_in_R_done <- -1
   iterations_in_Fortran_done <- 0
   repeat {
     iterations_in_R_done <- iterations_in_R_done + 1
-    if (verbose >= 4) {
+    if (verbose >= 5) {
       print("=== R step ===")
       print(paste0("tol_R_curr = ", tol_R_curr))
       print(paste0("dual objective: ", round(determinant(R_inv_curr)$modulus - sum(diag(R_inv_curr)), digits_to_print)))
@@ -210,7 +211,6 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
       Rinv = R_inv_curr,
       lambda = lambda,
       tol = tol_R_curr,
-      max_inner_iter = max_iter_R_inner,
       max_outer_iter = max_iter_R_outer_curr
     )
     if (any(is.nan(resR$Rinv)) | any(is.nan(resR$R))) {
@@ -219,7 +219,7 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
       return()
     }
     iterations_in_Fortran_done <- iterations_in_Fortran_done + resR$outer.count
-    if (verbose >= 4) {
+    if (verbose >= 5) {
       print("=== After R step ===")
       print(paste0("dual objective: ", round(determinant(resR$Rinv)$modulus - sum(diag(resR$Rinv)), digits_to_print)))
       print(paste0("lambda = ", round(lambda, digits_to_print), "; biggest err = ", round(max(abs(resR$Rinv - S_for_Fortran) - diag(diag(abs(resR$Rinv - S_for_Fortran)))), digits_to_print)))
@@ -234,7 +234,7 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
       max(abs(error_matrix))
     }
     dual_constraint_satisfied <- (dual_constraint_error <= lambda * 1.1) # 1.1 for approximate satisfaction
-    objective_is_better <- (proposed_objective > prev_objective - (tolerance_full_optimization * 2))
+    objective_is_better <- (proposed_objective > prev_objective - tolerance_full_optimization * 0.1)
 
     if (R_positive_definite & dual_constraint_satisfied & objective_is_better) {
       # no improvement is needed, we've converged
@@ -244,7 +244,7 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
       break
     }
 
-    if (verbose >= 3) {
+    if (verbose >= 4) {
       print(paste0(
         "Continue R optimization as ",
         if (!R_positive_definite) {
@@ -277,13 +277,13 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
 
     if (resR$outer.count < max_iter_R_outer) {
       new_tol_R_curr <- max(tol_R_curr / times_tol_decrease, tol_R)
-      if ((verbose >= 3) & (new_tol_R_curr < tol_R_curr)){
+      if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)){
         print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
       }
       tol_R_curr <- new_tol_R_curr
     } else {
       new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer)
-      if ((verbose >= 3) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)){
+      if ((verbose >= 4) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)){
         print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
       }
       max_iter_R_outer_curr <- new_max_iter_R_outer_curr

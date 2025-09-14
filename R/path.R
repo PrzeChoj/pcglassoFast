@@ -11,7 +11,7 @@
 #'   the lambda‑path search stops early.
 #' @param R0,R0_inv (p × p matrices) initial precision matrix and its inverse; defaults to \code{diag(p)}.
 #' @param D0 (numeric vector of length p) initial diagonal entries; default is \code{rep(1,p)}.
-#' @param max_iter,tolerance,tol_R,max_iter_R_inner,max_iter_R_outer,tol_D,max_iter_D_newton,max_iter_D_ls
+#' @param max_iter,tolerance,tol_R,max_iter_R_outer,tol_D,max_iter_D_newton,max_iter_D_ls
 #'         Parameters passed to [pcglassoFast()] for each \code{lambda}.
 #'
 #' @details
@@ -69,9 +69,8 @@ pcglassoPath <- function(
     tol_R = 1e-8,
     max_iter_R = 100,
     max_iter_R_outer = 500000,
-    max_iter_R_inner = max_iter_R_outer * nrow(S),
     tol_D = 1e-8,
-    max_iter_D_newton = 2000,
+    max_iter_D_newton = 5000,
     max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = 0) {
@@ -128,7 +127,6 @@ pcglassoPath <- function(
       tolerance = tolerance,
       tol_R = tol_R,
       max_iter_R = max_iter_R,
-      max_iter_R_inner = max_iter_R_inner,
       max_iter_R_outer = max_iter_R_outer,
       tol_D = tol_D,
       max_iter_D_newton = max_iter_D_newton,
