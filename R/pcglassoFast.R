@@ -79,6 +79,8 @@ pcglassoFast <- function(
   strating_time <- Sys.time()
   digits_to_print <- max(0, -floor(log10(tolerance)))
 
+  R_symetric <- (R + t(R))/2
+
   stop_loop <- FALSE
   objective_history <- function_to_optimize(R, D, C, lambda, alpha)
   if (verbose >= 2) {
@@ -87,22 +89,6 @@ pcglassoFast <- function(
 
   tol_D_curr <- 0.1
   times_tol_decrease <- 2
-
-  # R step, before loop
-  R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, 0)
-  R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
-  if (!R_optimizaiton_improved_objective) {
-    if (verbose >= 1) {
-      message("Ending optimization as objective worsen after the R optimizaiton.")
-    }
-    stop_loop <- TRUE
-  } else {
-    R <- R_result$R
-    R_symetric <- R_result$R_symetric
-    R_inv <- R_result$R_inv
-    objective_history <- c(objective_history, R_result$proposed_objective)
-  }
-
   while (!stop_loop && (length(objective_history)/2) < max_iter) {
     # D step
     if (verbose >= 5) {
@@ -119,10 +105,12 @@ pcglassoFast <- function(
     )
     proposed_objective <- function_to_optimize(R_symetric, resD$D, C, lambda, alpha)
     if (verbose >= 2) {
-      print(paste0("Iteration ", length(objective_history)/2, ". Objective: ", round(proposed_objective, digits_to_print), ", after ", resD$iter, " iters of D optim"))
+      print(paste0("Iteration ", (length(objective_history) + 1)/2, ". Objective: ", round(proposed_objective, digits_to_print), ", after ", resD$iter, " iters of D optim"))
     }
     improvement_D <- proposed_objective - objective_history[length(objective_history)]
-    improvement_R <- objective_history[length(objective_history)] - objective_history[length(objective_history) - 1]
+    improvement_R <- if (length(objective_history) >= 2) {
+      objective_history[length(objective_history)] - objective_history[length(objective_history) - 1]
+    } else { 0 }
     if (improvement_D < -tolerance * 0.1) {
       stop("D optimization worsen the objective; this should not occur")
     }
@@ -142,7 +130,7 @@ pcglassoFast <- function(
     objective_history <- c(objective_history, proposed_objective)
 
     # R step
-    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, (length(objective_history) - 1)/2)
+    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
 
     R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
     if (!R_optimizaiton_improved_objective) {
@@ -160,7 +148,7 @@ pcglassoFast <- function(
     # loop
     stop_loop <- (objective_history[length(objective_history)] - objective_history[length(objective_history) - 2] < tolerance)
     if ((verbose >= 1) && stop_loop) {
-      message(paste0("Ending optimization after ", (length(objective_history)/2), " iterations as objective improved less than a tolerance (", tolerance, ")"))
+      message(paste0("Ending optimization after ", floor(length(objective_history)/2), " iterations as objective improved less than a tolerance (", tolerance, ")"))
     }
 
     if ((verbose >= 1) && (length(objective_history)/2) >= max_iter) {
@@ -184,7 +172,8 @@ pcglassoFast <- function(
     "D" = D,
     "R_inv" = R_inv,
     "n_iters" = floor(length(objective_history)/2),
-    "objective" = objective_history
+    "objective" = objective_history,
+    "optimization_time" = optimization_time
   )
 }
 

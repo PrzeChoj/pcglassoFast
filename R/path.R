@@ -182,7 +182,8 @@ pcglassoPath <- function(
     W_path = outW,
     Wi_path = outWi,
     objective = objective_values,
-    iters = iters
+    iters = iters,
+    path_optimization_time = path_time_full
   )
 }
 
