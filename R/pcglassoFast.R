@@ -165,6 +165,7 @@ pcglassoFast <- function(
 
   R <- (R + t(R))/2
   D <- as.vector(D)
+  D <- D / sqrt(diag(S))
   list(
     "Sinv" = R * (D %o% D),
     "S" = R_inv * ((1 / D) %o% (1 / D)),
