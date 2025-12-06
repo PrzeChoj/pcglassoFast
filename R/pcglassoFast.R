@@ -12,7 +12,7 @@
 #' @param max_iter (integer) maximum number of iterations.
 #' @param tolerance (double) tolerance for convergence.
 #' @param tol_R,max_iter_R_outer
-#'         Parameters passed to [ROptim()] function.
+#'         Parameters passed to [ROptimFortran()] function.
 #' @param tol_D,max_iter_D_newton,max_iter_D_ls
 #'         Parameters passed to [DOptim()] function.
 #' @param verbose (integer) print information about optimization process.
@@ -195,7 +195,7 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
       print(paste0("dual objective: ", round(determinant(R_inv_curr)$modulus - sum(diag(R_inv_curr)), digits_to_print)))
       print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(R_inv_curr - S_for_Fortran) - diag(diag(abs(R_inv_curr - S_for_Fortran)))), digits_to_print)))
     }
-    resR <- ROptim(
+    resR <- ROptimFortran(
       S = S_for_Fortran,
       R = R_curr,
       Rinv = R_inv_curr,
@@ -293,7 +293,7 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
 
 #' Function that the `pcglassoFast()` is maximizing
 #'
-#' In `ROptim()`, this function is maximized with respect to `R`.
+#' In `ROptimFortran()`, this function is maximized with respect to `R`.
 #' In `DOptim()`, this function is maximized with respect to `D`.
 #'
 #' \eqn{function\_to\_optimize(R, D) = log(det(R)) + (1-\alpha)log(det(D^2)) - tr(DCDR) - \lambda ||R||_{1,off}}

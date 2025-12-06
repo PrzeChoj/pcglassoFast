@@ -1,5 +1,5 @@
 #' Optimize in R given D
-ROptim <- function(
+ROptimFortran <- function(
     S,
     R,
     Rinv,
