@@ -50,5 +50,12 @@ ROptimCpp <- function(
     loglik_old <- loglik
   }
   loglik_vec <- loglik_vec[1:(outer.count+1)]
-  return(list(Q = Q, Qinv = Qinv, outer.count = outer.count, loglik = loglik_vec))
+
+  list(
+    R           = Q,
+    R_symetric  = (Q + t(Q)) / 2,
+    Rinv        = Qinv,
+    outer.count = outer.count,
+    loglik      = loglik_vec
+  )
 }

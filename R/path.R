@@ -66,6 +66,7 @@ pcglassoPath <- function(
     # controls passed to pcglassoFast
     max_iter = 1000,
     tolerance = 1e-3,
+    solver_R = c("fortran", "cpp"),
     tol_R = 1e-8,
     max_iter_R = 100,
     max_iter_R_outer = 500000,
@@ -74,6 +75,7 @@ pcglassoPath <- function(
     max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = 0) {
+  solver_R <- match.arg(solver_R)
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
@@ -125,6 +127,7 @@ pcglassoPath <- function(
       D = D_curr,
       max_iter = max_iter,
       tolerance = tolerance,
+      solver_R = solver_R,
       tol_R = tol_R,
       max_iter_R = max_iter_R,
       max_iter_R_outer = max_iter_R_outer,

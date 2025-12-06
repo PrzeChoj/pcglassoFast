@@ -53,18 +53,19 @@
 #' S <- solve(S_inv.true) # data
 #'
 #' alpha <- 4 / 20 # 4 / n, as in Carter's paper
-#'
 #' pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 3)
 pcglassoFast <- function(
     S, lambda, alpha,
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
     max_iter = 1000, tolerance = 1e-3,
+    solver_R = c("fortran", "cpp"),
     tol_R = 1e-8,
     max_iter_R = 500, max_iter_R_outer = 500000,
     tol_D = 1e-8,
     max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = 0) {
+  solver_R <- match.arg(solver_R)
   stopifnot(
     is.matrix(S), nrow(S) == ncol(S),
     is.numeric(lambda), lambda >= 0,
@@ -130,7 +131,7 @@ pcglassoFast <- function(
     objective_history <- c(objective_history, proposed_objective)
 
     # R step
-    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
+    R_result <- R_step(C, D, lambda, alpha, R, R_inv, solver_R, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
 
     R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
     if (!R_optimizaiton_improved_objective) {
@@ -178,7 +179,7 @@ pcglassoFast <- function(
   )
 }
 
-R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
+R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, solver_R, tolerance_full_optimization, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
   p <- dim(C)[1]
   tol_R_curr <- 0.1
@@ -195,7 +196,13 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
       print(paste0("dual objective: ", round(determinant(R_inv_curr)$modulus - sum(diag(R_inv_curr)), digits_to_print)))
       print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(R_inv_curr - S_for_Fortran) - diag(diag(abs(R_inv_curr - S_for_Fortran)))), digits_to_print)))
     }
-    resR <- ROptimFortran(
+
+    solver_fun <- switch(
+      solver_R,
+      "fortran" = ROptimFortran,
+      "cpp"     = ROptimCpp
+    )
+    resR <- solver_fun(
       S = S_for_Fortran,
       R = R_curr,
       Rinv = R_inv_curr,
@@ -203,6 +210,7 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
       tol = tol_R_curr,
       max_outer_iter = max_iter_R_outer_curr
     )
+
     if (any(is.nan(resR$Rinv)) | any(is.nan(resR$R))) {
       warn("NaNs introduced in Fortran calculations")
       # TODO: Return with code error
@@ -253,7 +261,6 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optim
       }
       if (!R_positive_definite) {
         # fix R to be positive definite
-        # TODO: Warning
         warn(paste0("R optimization resulted in non-positive definite matrix"))
         desired_smallest_eigen_value <- 0.01
         x <- (1-desired_smallest_eigen_value) / (1-smallest_eigen_value)
