@@ -7,7 +7,7 @@
 function_to_optimize(R, d, C, lambda, alpha)
 }
 \description{
-In `ROptim()`, this function is maximized with respect to `R`.
+In `ROptimFortran()`, this function is maximized with respect to `R`.
 In `DOptim()`, this function is maximized with respect to `D`.
 }
 \details{

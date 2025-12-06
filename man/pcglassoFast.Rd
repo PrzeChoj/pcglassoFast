@@ -43,7 +43,7 @@ matrix (it is recommended to left it default).}
 
 \item{tolerance}{(double) tolerance for convergence.}
 
-\item{tol_R, max_iter_R_outer}{Parameters passed to \code{\link[=ROptim]{ROptim()}} function.}
+\item{tol_R, max_iter_R_outer}{Parameters passed to \code{\link[=ROptimFortran]{ROptimFortran()}} function.}
 
 \item{tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=DOptim]{DOptim()}} function.}
 
