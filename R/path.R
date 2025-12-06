@@ -87,7 +87,7 @@ pcglassoPath <- function(
     min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
     max_edge_fraction >= 0 && max_edge_fraction <= 1,
     length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton),
-    verbose %in% 0:4 # can be TRUE (1) or FALSE (0)
+    verbose %in% 0:5 # can be TRUE (1) or FALSE (0)
   )
   path_time_start <- Sys.time()
 

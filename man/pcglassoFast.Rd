@@ -13,10 +13,11 @@ pcglassoFast(
   D = rep(1, dim(S)[1]),
   max_iter = 1000,
   tolerance = 0.001,
-  tol_R = 1e-08,
+  solver_R = c("fortran", "cpp"),
+  tol_R = min(tolerance, 1e-08),
   max_iter_R = 500,
   max_iter_R_outer = 5e+05,
-  tol_D = 1e-08,
+  tol_D = min(tolerance, 1e-08),
   max_iter_D_newton = 5000,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
@@ -89,7 +90,6 @@ S_inv.true <- diag(D.true) \%*\% R.true \%*\% diag(D.true)
 S <- solve(S_inv.true) # data
 
 alpha <- 4 / 20 # 4 / n, as in Carter's paper
-
 pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 3)
 }
 \seealso{

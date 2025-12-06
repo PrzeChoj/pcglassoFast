@@ -7,14 +7,14 @@ R_step_cpp <- function(
   resR <- ROptimCpp(
     S = C * (D %o% D),
     R = R_curr, Rinv = R_inv_curr,
-    lambda = lambda, tol = tol_R, max_outer_iter = max_iter_R_outer
+    lambda = lambda, tol = tol_R_curr, max_outer_iter = max_iter_R
   )
 
   proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
   iterations_done <- length(resR$loglik)
 
   if (verbose >= 2) {
-    print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ", after ", iterations_done, " iters of R optim"))
+    print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_done, " iters of R optim"))
   }
 
   list(
@@ -22,7 +22,6 @@ R_step_cpp <- function(
     R_symetric = resR$R_symetric,
     R_inv = resR$Rinv,
     proposed_objective = proposed_objective,
-    tol_R_curr = tol_R_curr,
     iterations_done = iterations_done
   )
 }
@@ -32,6 +31,7 @@ R_step_cpp <- function(
 #' @param S (p x p) empirical covariance matrix
 #' @param Q (p x p) precision matrix
 #' @return loglik (double)
+#' @noRd
 loglik <- function(S, Q) {
   R <- chol(Q)
   return((sum(log(diag(R))) - 0.5 * sum(diag(S %*% Q))))

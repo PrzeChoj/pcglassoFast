@@ -59,9 +59,9 @@ pcglassoFast <- function(
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
     max_iter = 1000, tolerance = 1e-3,
     solver_R = c("fortran", "cpp"),
-    tol_R = 1e-8,
+    tol_R = min(tolerance, 1e-8),
     max_iter_R = 500, max_iter_R_outer = 500000,
-    tol_D = 1e-8,
+    tol_D = min(tolerance, 1e-8),
     max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = 0) {
@@ -74,7 +74,7 @@ pcglassoFast <- function(
     is.matrix(R), is.matrix(R_inv),
     length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton),
     all(diag(R) == rep(1, nrow(S))),
-    verbose %in% 0:4 # can be TRUE (1) or FALSE (0)
+    verbose %in% 0:5 # can be TRUE (1) or FALSE (0)
   )
   C <- cov2cor(S)
   strating_time <- Sys.time()
@@ -90,7 +90,8 @@ pcglassoFast <- function(
 
   tol_D_curr <- 0.1
   tol_R_curr <- 0.1
-  times_tol_decrease <- 2
+  times_tol_D_decrease <- 10
+  times_tol_R_decrease <- 2
   while (!stop_loop && (length(objective_history)/2) < max_iter) {
     # D step
     if (verbose >= 5) {
@@ -107,7 +108,7 @@ pcglassoFast <- function(
     )
     proposed_objective <- function_to_optimize(R_symetric, D_result$D, C, lambda, alpha)
     if (verbose >= 2) {
-      print(paste0("Iteration ", (length(objective_history) + 1)/2, ". Objective: ", round(proposed_objective, digits_to_print), ", after ", D_result$iter, " iters of D optim"))
+      print(paste0("Iteration ", (length(objective_history) + 1)/2, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - objective_history[length(objective_history)], digits_to_print), ", after ", D_result$iter, " iters of D optim"))
     }
     improvement_D <- proposed_objective - objective_history[length(objective_history)]
     improvement_R <- if (length(objective_history) >= 2) {
@@ -117,8 +118,8 @@ pcglassoFast <- function(
       stop("D optimization worsen the objective; this should not occur")
     }
 
-    if (improvement_D < improvement_R * 2) {
-      new_tol_D_curr <- max(tol_D, tol_D_curr / times_tol_decrease)
+    if (improvement_D < improvement_R) {
+      new_tol_D_curr <- max(tol_D, tol_D_curr / times_tol_D_decrease)
       if ((verbose >= 3) & (tol_D < tol_D_curr)) {
         message(paste0("Decreasing tol_D_curr to ", new_tol_D_curr))
       }
@@ -137,8 +138,7 @@ pcglassoFast <- function(
       "fortran" = R_step_fortran,
       "cpp"     = R_step_cpp
     )
-    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
-    tol_R_curr <- R_result$tol_R_curr
+    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
 
     R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
     if (!R_optimizaiton_improved_objective) {
@@ -151,13 +151,14 @@ pcglassoFast <- function(
     R <- R_result$R
     R_symetric <- R_result$R_symetric
     R_inv <- R_result$R_inv
+    improvement_R <- R_result$proposed_objective - objective_history[length(objective_history)]
     objective_history <- c(objective_history, R_result$proposed_objective)
 
     # decrease tol_R_curr
-    if (R_result$iterations_done < D_result$iterations_done) {
-      new_tol_R_curr <- max(tol_R_curr / times_tol_decrease, tol_R)
-      if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)){
-        print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
+    if (improvement_R * 10 < improvement_D) {
+      new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
+      if ((verbose >= 3) & (new_tol_R_curr < tol_R_curr)){
+        message(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
       }
       tol_R_curr <- new_tol_R_curr
     }
@@ -195,7 +196,7 @@ pcglassoFast <- function(
   )
 }
 
-R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
+R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
   p <- dim(C)[1]
   max_iter_R_outer_curr <- 100
@@ -247,7 +248,7 @@ R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_fu
     if (R_positive_definite & dual_constraint_satisfied & objective_is_better) {
       # no improvement is needed, we've converged
       if (verbose >= 2) {
-        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ", after ", iterations_in_Fortran_done, " iters of R optim"))
+        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(prev_objective - proposed_objective, digits_to_print), ", after ", iterations_in_Fortran_done, " iters of R optim"))
       }
       break
     }
@@ -283,9 +284,9 @@ R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_fu
     }
 
     if (resR$outer.count < max_iter_R_outer) {
-      new_tol_R_curr <- max(tol_R_curr / times_tol_decrease, tol_R)
+      new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
       if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)){
-        print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
+        print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
       }
       tol_R_curr <- new_tol_R_curr
     } else {
@@ -304,7 +305,6 @@ R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_fu
     R_symetric = resR$R_symetric,
     R_inv = resR$Rinv,
     proposed_objective = proposed_objective,
-    tol_R_curr = tol_R_curr,
     iterations_done = iterations_in_Fortran_done
   )
 }
