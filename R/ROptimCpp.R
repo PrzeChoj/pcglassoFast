@@ -1,6 +1,6 @@
 R_step_cpp <- function(
     C, D, lambda, alpha, R_curr, R_inv_curr,
-    tolerance_full_optimization, times_tol_decrease, tol_R,
+    tolerance_full_optimization, times_tol_decrease, tol_R, tol_R_curr,
     max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
 
@@ -11,17 +11,19 @@ R_step_cpp <- function(
   )
 
   proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+  iterations_done <- length(resR$loglik)
 
   if (verbose >= 2) {
-    iterations_in_Fortran_done <- length(resR$loglik)
-    print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ", after ", iterations_in_Fortran_done, " iters of R optim"))
+    print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ", after ", iterations_done, " iters of R optim"))
   }
 
   list(
     R = resR$R,
     R_symetric = resR$R_symetric,
     R_inv = resR$Rinv,
-    proposed_objective = proposed_objective
+    proposed_objective = proposed_objective,
+    tol_R_curr = tol_R_curr,
+    iterations_done = iterations_done
   )
 }
 
