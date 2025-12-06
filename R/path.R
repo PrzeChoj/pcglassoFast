@@ -79,6 +79,7 @@ pcglassoPath <- function(
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
+    !is.null(R0),
     nrow(R0) == ncol(R0),
     nrow(R0) == nrow(S),
     length(D0) == nrow(S),

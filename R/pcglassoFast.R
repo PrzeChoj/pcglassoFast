@@ -68,6 +68,7 @@ pcglassoFast <- function(
   solver_R <- match.arg(solver_R)
   stopifnot(
     is.matrix(S), nrow(S) == ncol(S),
+    !is.null(R),
     is.numeric(lambda), lambda >= 0,
     is.numeric(alpha),
     max_iter >= 1, tolerance > 0,
