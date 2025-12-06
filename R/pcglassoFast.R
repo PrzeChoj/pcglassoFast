@@ -59,9 +59,9 @@ pcglassoFast <- function(
     R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
     max_iter = 1000, tolerance = 1e-3,
     solver_R = c("fortran", "cpp"),
-    tol_R = min(tolerance, 1e-8),
+    tol_R = 1e-8,
     max_iter_R = 500, max_iter_R_outer = 500000,
-    tol_D = min(tolerance, 1e-8),
+    tol_D = 1e-8,
     max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = 0) {
@@ -156,7 +156,7 @@ pcglassoFast <- function(
     objective_history <- c(objective_history, R_result$proposed_objective)
 
     # decrease tol_R_curr
-    if (improvement_R * 10 < improvement_D) {
+    if ((improvement_R * 10 < improvement_D) | (improvement_D < tolerance)) {
       new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
       if ((verbose >= 3) & (new_tol_R_curr < tol_R_curr)){
         message(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
