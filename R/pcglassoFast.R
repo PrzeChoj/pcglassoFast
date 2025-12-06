@@ -131,7 +131,12 @@ pcglassoFast <- function(
     objective_history <- c(objective_history, proposed_objective)
 
     # R step
-    R_result <- R_step(C, D, lambda, alpha, R, R_inv, solver_R, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
+    R_step <- switch(
+      solver_R,
+      "fortran" = R_step_fortran,
+      "cpp"     = R_step_cpp
+    )
+    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
 
     R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
     if (!R_optimizaiton_improved_objective) {
@@ -179,7 +184,7 @@ pcglassoFast <- function(
   )
 }
 
-R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, solver_R, tolerance_full_optimization, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
+R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_decrease, tol_R, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
   p <- dim(C)[1]
   tol_R_curr <- 0.1
@@ -197,12 +202,7 @@ R_step <- function(C, D, lambda, alpha, R_curr, R_inv_curr, solver_R, tolerance_
       print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(R_inv_curr - S_for_Fortran) - diag(diag(abs(R_inv_curr - S_for_Fortran)))), digits_to_print)))
     }
 
-    solver_fun <- switch(
-      solver_R,
-      "fortran" = ROptimFortran,
-      "cpp"     = ROptimCpp
-    )
-    resR <- solver_fun(
+    resR <- ROptimFortran(
       S = S_for_Fortran,
       R = R_curr,
       Rinv = R_inv_curr,
