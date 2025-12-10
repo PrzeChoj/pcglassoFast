@@ -45,6 +45,7 @@ ROptimCpp <- function(
     tol = 1e-4,
     max_outer_iter = 100) {
   stopifnot(!is.null(Rinv))
+  p <- dim(S)[1]
 
   Q <- R
   Qinv <- Rinv
