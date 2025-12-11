@@ -249,7 +249,7 @@ R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_fu
     if (R_positive_definite & dual_constraint_satisfied & objective_is_better) {
       # no improvement is needed, we've converged
       if (verbose >= 2) {
-        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(prev_objective - proposed_objective, digits_to_print), ", after ", iterations_in_Fortran_done, " iters of R optim"))
+        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_in_Fortran_done, " iters of R optim"))
       }
       break
     }
