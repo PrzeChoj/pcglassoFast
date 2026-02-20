@@ -18,6 +18,7 @@ Imports:
     Matrix,
     methods,
     pracma,
+    Rcpp,
     rlang,
     stats,
     utils

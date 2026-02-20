@@ -37,6 +37,8 @@ loglik <- function(S, Q) {
   return((sum(log(diag(R))) - 0.5 * sum(diag(S %*% Q))))
 }
 
+#' @useDynLib pcglassoFast, .registration = TRUE
+#' @import Rcpp
 ROptimCpp <- function(
     S,
     R,
