@@ -16,7 +16,7 @@ pcglassoPath(
   D0 = rep(1, nrow(S)),
   max_iter = 1000,
   tolerance = 0.001,
-  solver_R = c("fortran", "cpp"),
+  solver_R = c("dual", "cpp"),
   tol_R = 1e-08,
   max_iter_R = 100,
   max_iter_R_outer = 5e+05,

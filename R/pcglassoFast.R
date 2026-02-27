@@ -12,7 +12,7 @@
 #' @param max_iter (integer) maximum number of iterations.
 #' @param tolerance (double) tolerance for convergence.
 #' @param tol_R,max_iter_R_outer
-#'         Parameters passed to [ROptimFortran()] function.
+#'         Parameters passed to [ROptimDual()] function.
 #' @param tol_D,max_iter_D_newton,max_iter_D_ls
 #'         Parameters passed to [DOptim()] function.
 #' @param verbose (integer) print information about optimization process.
@@ -60,7 +60,7 @@ pcglassoFast <- function(
     R0_inv = solve(R0),
     D = rep(1, dim(S)[1]),
     max_iter = 1000, tolerance = 1e-3,
-    solver_R = c("fortran", "cpp"),
+    solver_R = c("dual", "primal"),
     tol_R = 1e-8,
     max_iter_R = 500, max_iter_R_outer = 500000,
     tol_D = 1e-8,
@@ -156,8 +156,8 @@ pcglassoFast <- function(
     # R step
     R_step <- switch(
       solver_R,
-      "fortran" = R_step_fortran,
-      "cpp"     = R_step_cpp
+      "dual" = R_step_dual,
+      "primal" = R_step_primal
     )
     R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
 
@@ -217,25 +217,25 @@ pcglassoFast <- function(
   )
 }
 
-R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
+R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
   p <- dim(C)[1]
   max_iter_R_outer_curr <- 100
 
-  S_for_Fortran <- C * (D %o% D)
+  S_for_dual <- C * (D %o% D)
   iterations_in_R_done <- -1
-  iterations_in_Fortran_done <- 0
+  iterations_in_dual_done <- 0
   repeat {
     iterations_in_R_done <- iterations_in_R_done + 1
     if (verbose >= 5) {
       print("=== R step ===")
       print(paste0("tol_R_curr = ", tol_R_curr))
       print(paste0("dual objective: ", round(determinant(R_inv_curr)$modulus - sum(diag(R_inv_curr)), digits_to_print)))
-      print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(R_inv_curr - S_for_Fortran) - diag(diag(abs(R_inv_curr - S_for_Fortran)))), digits_to_print)))
+      print(paste0("lambda = ", round(lambda, 3), "; biggest err = ", round(max(abs(R_inv_curr - S_for_dual) - diag(diag(abs(R_inv_curr - S_for_dual)))), digits_to_print)))
     }
 
-    resR <- ROptimFortran(
-      S = S_for_Fortran,
+    resR <- ROptimDual(
+      S = S_for_dual,
       R = R_curr,
       Rinv = R_inv_curr,
       lambda = lambda,
@@ -244,22 +244,22 @@ R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_fu
     )
 
     if (any(is.nan(resR$Rinv)) | any(is.nan(resR$R))) {
-      warn("NaNs introduced in Fortran calculations")
+      warn("NaNs introduced in dual calculations")
       # TODO: Return with code error
       return()
     }
-    iterations_in_Fortran_done <- iterations_in_Fortran_done + resR$outer.count
+    iterations_in_dual_done <- iterations_in_dual_done + resR$outer.count
     if (verbose >= 5) {
       print("=== After R step ===")
       print(paste0("dual objective: ", round(determinant(resR$Rinv)$modulus - sum(diag(resR$Rinv)), digits_to_print)))
-      print(paste0("lambda = ", round(lambda, digits_to_print), "; biggest err = ", round(max(abs(resR$Rinv - S_for_Fortran) - diag(diag(abs(resR$Rinv - S_for_Fortran)))), digits_to_print)))
+      print(paste0("lambda = ", round(lambda, digits_to_print), "; biggest err = ", round(max(abs(resR$Rinv - S_for_dual) - diag(diag(abs(resR$Rinv - S_for_dual)))), digits_to_print)))
     }
     proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
 
     smallest_eigen_value <- eigen(resR$R_symetric, TRUE, TRUE)$values[p]
     R_positive_definite <- (smallest_eigen_value > 0)
     dual_constraint_error <- {
-      error_matrix <- resR$Rinv - S_for_Fortran
+      error_matrix <- resR$Rinv - S_for_dual
       diag(error_matrix) <- 0 # dual constraint involve only off-diagonal
       max(abs(error_matrix))
     }
@@ -269,7 +269,7 @@ R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_fu
     if (R_positive_definite & dual_constraint_satisfied & objective_is_better) {
       # no improvement is needed, we've converged
       if (verbose >= 2) {
-        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_in_Fortran_done, " iters of R optim"))
+        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_in_dual_done, " iters of R optim"))
       }
       break
     }
@@ -326,14 +326,14 @@ R_step_fortran <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_fu
     R_symetric = resR$R_symetric,
     R_inv = resR$Rinv,
     proposed_objective = proposed_objective,
-    iterations_done = iterations_in_Fortran_done
+    iterations_done = iterations_in_dual_done
   )
 }
 
 
 #' Function that the `pcglassoFast()` is maximizing
 #'
-#' In `ROptimFortran()`, this function is maximized with respect to `R`.
+#' In `ROptimDual()`, this function is maximized with respect to `R`.
 #' In `DOptim()`, this function is maximized with respect to `D`.
 #'
 #' \eqn{function\_to\_optimize(R, D) = log(det(R)) + (1-\alpha)log(det(D^2)) - tr(DCDR) - \lambda ||R||_{1,off}}

@@ -1,10 +1,10 @@
-R_step_cpp <- function(
+R_step_primal <- function(
     C, D, lambda, alpha, R_curr, R_inv_curr,
     tolerance_full_optimization, times_tol_decrease, tol_R, tol_R_curr,
     max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
 
-  resR <- ROptimCpp(
+  resR <- ROptimPrimal(
     S = C * (D %o% D),
     R = R_curr, Rinv = R_inv_curr,
     lambda = lambda, tol = tol_R_curr, max_outer_iter = max_iter_R
@@ -39,7 +39,7 @@ loglik <- function(S, Q) {
 
 #' @useDynLib pcglassoFast, .registration = TRUE
 #' @import Rcpp
-ROptimCpp <- function(
+ROptimPrimal <- function(
     S,
     R,
     Rinv,
