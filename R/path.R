@@ -60,7 +60,7 @@ pcglassoPath <- function(
     min_lambda_ratio = 0.01,
     max_edge_fraction = 1.0,
     # initial R, D (at the largest lambda)
-    R0 = diag(nrow(S)),
+    R0 = .default_R0(S),
     R0_inv = solve(R0),
     D0 = rep(1, nrow(S)),
     # controls passed to pcglassoFast
@@ -79,11 +79,29 @@ pcglassoPath <- function(
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
+    all(is.finite(S)),
+    is.finite(mean(diag(S))),
+    mean(diag(S)) > 0)
+  R0 <- tryCatch(
+    R0,  # call promise
+    error = function(e) {
+      stop("Failed to compute R0 (default_R0 / user-supplied). ",
+           "Likely: S not invertible even after jitter, or invalid values. ",
+           "Original error: ", conditionMessage(e),
+           call. = FALSE)
+    }
+  )
+  stopifnot(
     !is.null(R0),
     nrow(R0) == ncol(R0),
+    all(diag(R0) == 1),
     nrow(R0) == nrow(S),
     length(D0) == nrow(S),
+    all(is.finite(D0)), all(D0 > 0),
     is.numeric(alpha),
+    is.numeric(nlambda), nlambda >= 1,
+    is.numeric(tolerance), tolerance > 0,
+    max_iter >= 1,
     is.null(lambdas) || is.numeric(lambdas),
     min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
     max_edge_fraction >= 0 && max_edge_fraction <= 1,

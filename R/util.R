@@ -179,3 +179,9 @@ compare_matrices <- function(Q, Q_est) {
     stringsAsFactors = FALSE
   )
 }
+
+.default_R0 <- function(S) {
+  p <- nrow(S)
+  eps <- max(1e-8, 1e-8 * mean(diag(S), na.rm=TRUE))
+  cov2cor(solve(S + eps * diag(p)))
+}

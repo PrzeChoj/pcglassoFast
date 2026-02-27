@@ -56,7 +56,9 @@
 #' pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 3)
 pcglassoFast <- function(
     S, lambda, alpha,
-    R = diag(dim(S)[1]), R_inv = solve(R), D = rep(1, dim(S)[1]),
+    R0 = .default_R0(S),
+    R0_inv = solve(R0),
+    D = rep(1, dim(S)[1]),
     max_iter = 1000, tolerance = 1e-3,
     solver_R = c("fortran", "cpp"),
     tol_R = 1e-8,
@@ -67,16 +69,34 @@ pcglassoFast <- function(
     verbose = 0) {
   solver_R <- match.arg(solver_R)
   stopifnot(
-    is.matrix(S), nrow(S) == ncol(S),
-    !is.null(R),
+    is.matrix(S),
+    nrow(S) == ncol(S),
+    all(is.finite(S)),
+    is.finite(mean(diag(S))),
+    mean(diag(S)) > 0)
+  R0 <- tryCatch(
+    R0,  # call promise
+    error = function(e) {
+      stop("Failed to compute R0 (default_R0 / user-supplied). ",
+           "Likely: S not invertible even after jitter, or invalid values. ",
+           "Original error: ", conditionMessage(e),
+           call. = FALSE)
+    }
+  )
+  stopifnot(
+    !is.null(R0),
     is.numeric(lambda), lambda >= 0,
     is.numeric(alpha),
     max_iter >= 1, tolerance > 0,
-    is.matrix(R), is.matrix(R_inv),
+    is.matrix(R0), is.matrix(R0_inv),
     length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton),
-    all(diag(R) == rep(1, nrow(S))),
+    all(diag(R0) == 1),
+    nrow(R0_inv) == nrow(S),
+    all(is.finite(R0)), all(is.finite(R0_inv)),
     verbose %in% 0:5 # can be TRUE (1) or FALSE (0)
   )
+  R <- R0
+  R_inv <- R0_inv
   C <- cov2cor(S)
   strating_time <- Sys.time()
   digits_to_print <- max(0, -floor(log10(tolerance)))

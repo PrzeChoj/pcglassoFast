@@ -8,8 +8,8 @@ pcglassoFast(
   S,
   lambda,
   alpha,
-  R = diag(dim(S)[1]),
-  R_inv = solve(R),
+  R0 = .default_R0(S),
+  R0_inv = solve(R0),
   D = rep(1, dim(S)[1]),
   max_iter = 1000,
   tolerance = 0.001,
@@ -34,9 +34,6 @@ Parameters of the method. See Details section below.
 \item \eqn{\alpha} is a penalty for on-diagonal
 }}
 
-\item{R, R_inv}{(p x p matrix, unit diagonal) initial estimation of
-precision matrix (it is recommended to left it default).}
-
 \item{D}{(vector of length p) diagonal of initial estimation of diagonal
 matrix (it is recommended to left it default).}
 
@@ -57,6 +54,9 @@ matrix (it is recommended to left it default).}
 \item 4 -> information about tolerance adaptation for R optimization
 \item 5 -> details about the R matrix optimization
 }}
+
+\item{R, R_inv}{(p x p matrix, unit diagonal) initial estimation of
+precision matrix (it is recommended to left it default).}
 }
 \value{
 list of three elements:

@@ -11,7 +11,7 @@ pcglassoPath(
   nlambda = 50,
   min_lambda_ratio = 0.01,
   max_edge_fraction = 1,
-  R0 = diag(nrow(S)),
+  R0 = .default_R0(S),
   R0_inv = solve(R0),
   D0 = rep(1, nrow(S)),
   max_iter = 1000,
