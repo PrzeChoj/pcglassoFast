@@ -75,6 +75,7 @@ pcglassoPath <- function(
     max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = 0) {
+  solver_R <- tolower(solver_R)
   solver_R <- match.arg(solver_R)
   stopifnot(
     is.matrix(S),
