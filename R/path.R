@@ -66,7 +66,7 @@ pcglassoPath <- function(
     # controls passed to pcglassoFast
     max_iter = 1000,
     tolerance = 1e-3,
-    solver_R = c("dual", "cpp"),
+    solver_R = c("dual", "primal"),
     tol_R = 1e-8,
     max_iter_R = 100,
     max_iter_R_outer = 500000,
