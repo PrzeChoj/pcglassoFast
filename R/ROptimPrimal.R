@@ -44,7 +44,7 @@ ROptimPrimal <- function(
     R,
     Rinv,
     lambda,
-    tol = 1e-4,
+    tol = 1e-8,
     max_outer_iter = 100) {
   stopifnot(!is.null(Rinv))
   p <- dim(R)[1]
@@ -56,6 +56,7 @@ ROptimPrimal <- function(
     stop() # TODO(Diagonal S)
   }
   tol.outer <- tol*shr/(p-1)
+  tol.outer <- tol/(p-1)
   tol.inner <- tol.outer / p
   max.outer.iter <- max_outer_iter
   max.inner.iter <- max.outer.iter * p
@@ -75,6 +76,7 @@ ROptimPrimal <- function(
     #loglik <- loglik(S, Q) - lambda * sum(abs(Q))
 
     err.outer <- loglik - loglik_old
+    #cat('err.outer = ',err.outer, ' tol.outer = ',tol.outer,'\n' )
     crit.outer <- ((err.outer > tol.outer) & (outer.count < max.outer.iter))
 
     outer.count <- outer.count + 1

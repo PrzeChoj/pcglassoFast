@@ -144,7 +144,7 @@ pcglassoPath <- function(
       alpha = alpha,
       R0 = R_curr,
       R0_inv = Rinv_curr,
-      D = D_curr,
+      D = D_curr ,
       max_iter = max_iter,
       tolerance = tolerance,
       solver_R = solver_R,
@@ -171,7 +171,7 @@ pcglassoPath <- function(
     outWi[[k]] <- Rinv_curr * ((1/D_curr) %o% (1/D_curr))
     iters[k] <- fit$n_iters
     objective_values[k] <- utils::tail(fit$objective, 1)
-
+    D_curr <- D_curr*sqrt(diag(S)) #to fix
     # compute edge fraction and early stop
     edge_frac <- (sum(R_curr != 0) - p) / (p * (p - 1))
     if (edge_frac > max_edge_fraction) {

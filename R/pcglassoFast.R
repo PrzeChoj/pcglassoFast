@@ -170,7 +170,9 @@ pcglassoFast <- function(
       }
       break
     }
+
     R <- R_result$R
+    #cat('iter = ',R_result$iterations_done,'non zero =',sum(abs(R - diag(diag(R)) )> 0),'\n')
     R_symetric <- R_result$R_symetric
     R_inv <- R_result$R_inv
     improvement_R <- R_result$proposed_objective - objective_history[length(objective_history)]
