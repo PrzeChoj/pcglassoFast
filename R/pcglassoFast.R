@@ -107,7 +107,7 @@ pcglassoFast <- function(
   stop_loop <- FALSE
   objective_history <- function_to_optimize(R, D, C, lambda, alpha)
   if (verbose >= 2) {
-    print(paste0("Iteration 0. objective: ", round(objective_history, digits_to_print)))
+    print(paste0("Iteration 0. Objective: ", round(objective_history, digits_to_print)))
   }
 
   tol_D_curr <- 0.1
@@ -172,7 +172,6 @@ pcglassoFast <- function(
     }
 
     R <- R_result$R
-    #cat('iter = ',R_result$iterations_done,'non zero =',sum(abs(R - diag(diag(R)) )> 0),'\n')
     R_symetric <- R_result$R_symetric
     R_inv <- R_result$R_inv
     improvement_R <- R_result$proposed_objective - objective_history[length(objective_history)]

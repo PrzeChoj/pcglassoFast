@@ -4,7 +4,7 @@ ROptimDual <- function(
     R,
     Rinv,
     lambda,
-    tol = 1e-4,
+    tol = 1e-8,
     max_outer_iter = 100) {
   if (is.null(Rinv)) {
     Rinv <- solve(R)

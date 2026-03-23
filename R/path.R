@@ -144,7 +144,7 @@ pcglassoPath <- function(
       alpha = alpha,
       R0 = R_curr,
       R0_inv = Rinv_curr,
-      D = D_curr ,
+      D = D_curr,
       max_iter = max_iter,
       tolerance = tolerance,
       solver_R = solver_R,

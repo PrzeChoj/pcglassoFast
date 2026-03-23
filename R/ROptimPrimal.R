@@ -73,10 +73,8 @@ ROptimPrimal <- function(
   while (crit.outer) {
     # loop over vector
     loglik = updateLoopCpp(S, Q, Qinv, loglik, lambda, tol.inner, max.inner.iter)
-    #loglik <- loglik(S, Q) - lambda * sum(abs(Q))
 
     err.outer <- loglik - loglik_old
-    #cat('err.outer = ',err.outer, ' tol.outer = ',tol.outer,'\n' )
     crit.outer <- ((err.outer > tol.outer) & (outer.count < max.outer.iter))
 
     outer.count <- outer.count + 1
