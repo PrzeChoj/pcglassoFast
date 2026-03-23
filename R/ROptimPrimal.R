@@ -51,19 +51,26 @@ ROptimPrimal <- function(
   Q <- R
   Qinv <- Rinv
   lambda <- lambda/2
-  shr <- sum(abs(S - diag(S)))
+  shr <- sum(abs(S - diag(diag(S))))
   if (shr == 0) {
-    stop() # TODO(Diagonal S)
+    # S is diagonal
+
+    list(
+      R           = diag(p),
+      R_symetric  = diag(p),
+      Rinv        = diag(p),
+      outer.count = 0,
+      loglik      = loglik(S, diag(p)) - lambda * p
+    )
   }
   tol.outer <- tol*shr/(p-1)
-  tol.outer <- tol/(p-1)
   tol.inner <- tol.outer / p
   max.outer.iter <- max_outer_iter
   max.inner.iter <- max.outer.iter * p
 
   p <- dim(Q)[1]
-  loglik_old <- loglik(S, Q) - lambda * sum(abs(Q))
-  loglik_vec <- rep(0,max.outer.iter)
+  loglik_old <- loglik(S, Q) - lambda * sum(abs(Q)) # TODO: AC, are we sure we ant the sum(abs(Q))? not sum(abs(Q - diag(diag(Q))))?
+  loglik_vec <- rep(NA, max.outer.iter)
   loglik_vec[1] <- loglik_old
   loglik <- loglik_old
   outer.count <- 0
@@ -72,7 +79,7 @@ ROptimPrimal <- function(
   Qinv[1,1] <- Qinv[1,1] + 0
   while (crit.outer) {
     # loop over vector
-    loglik = updateLoopCpp(S, Q, Qinv, loglik, lambda, tol.inner, max.inner.iter)
+    loglik <- updateLoopCpp(S, Q, Qinv, loglik, lambda, tol.inner, max.inner.iter)
 
     err.outer <- loglik - loglik_old
     crit.outer <- ((err.outer > tol.outer) & (outer.count < max.outer.iter))
@@ -81,7 +88,7 @@ ROptimPrimal <- function(
     loglik_vec[outer.count+1] <- loglik
     loglik_old <- loglik
   }
-  loglik_vec <- loglik_vec[1:(outer.count+1)]
+  loglik_vec <- loglik_vec[!is.na(loglik_vec)]
 
   list(
     R           = Q,
