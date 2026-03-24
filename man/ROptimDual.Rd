@@ -4,7 +4,7 @@
 \alias{ROptimDual}
 \title{Optimize in R given D}
 \usage{
-ROptimDual(S, R, Rinv, lambda, tol = 1e-04, max_outer_iter = 100)
+ROptimDual(S, R, Rinv, lambda, tol = 1e-08, max_outer_iter = 100)
 }
 \description{
 Optimize in R given D

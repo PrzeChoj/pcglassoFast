@@ -5,9 +5,9 @@
 #'         Parameters of the method. See Details section below.
 #'   * \eqn{\lambda} is a penalty for off-diagonal
 #'   * \eqn{\alpha} is a penalty for on-diagonal
-#' @param R,R_inv (p x p matrix, unit diagonal) initial estimation of
+#' @param R0,R0_inv (p x p matrix, unit diagonal) initial estimation of
 #'         precision matrix (it is recommended to left it default).
-#' @param D (vector of length p) diagonal of initial estimation of diagonal
+#' @param D0 (vector of length p) diagonal of initial estimation of diagonal
 #'         matrix (it is recommended to left it default).
 #' @param max_iter (integer) maximum number of iterations.
 #' @param tolerance (double) tolerance for convergence.
@@ -58,7 +58,7 @@ pcglassoFast <- function(
     S, lambda, alpha,
     R0 = .default_R0(S),
     R0_inv = solve(R0),
-    D = 1/sqrt(diag(S)),
+    D0 = rep(1, nrow(S))/sqrt(diag(S)),
     max_iter = 1000, tolerance = 1e-3,
     solver_R = c("dual", "primal"),
     tol_R = 1e-8,
@@ -96,7 +96,7 @@ pcglassoFast <- function(
     all(is.finite(R0)), all(is.finite(R0_inv)),
     verbose %in% 0:5 # can be TRUE (1) or FALSE (0)
   )
-  D <- D * sqrt(diag(S))
+  D <- D0 * sqrt(diag(S))
   R <- R0
   R_inv <- R0_inv
   C <- cov2cor(S)

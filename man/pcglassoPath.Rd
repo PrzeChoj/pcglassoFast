@@ -13,7 +13,7 @@ pcglassoPath(
   max_edge_fraction = 1,
   R0 = .default_R0(S),
   R0_inv = solve(R0),
-  D0 = rep(1, nrow(S)),
+  D0 = rep(1, nrow(S))/sqrt(diag(S)),
   max_iter = 1000,
   tolerance = 0.001,
   solver_R = c("dual", "primal"),

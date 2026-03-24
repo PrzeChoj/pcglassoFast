@@ -62,7 +62,7 @@ pcglassoPath <- function(
     # initial R, D (at the largest lambda)
     R0 = .default_R0(S),
     R0_inv = solve(R0),
-    D0 = rep(1, nrow(S)),
+    D0 = rep(1, nrow(S))/sqrt(diag(S)),
     # controls passed to pcglassoFast
     max_iter = 1000,
     tolerance = 1e-3,
