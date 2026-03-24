@@ -54,13 +54,12 @@ ROptimPrimal <- function(
   shr <- sum(abs(S - diag(diag(S))))
   if (shr == 0) {
     # S is diagonal
-
     list(
       R           = diag(p),
       R_symetric  = diag(p),
       Rinv        = diag(p),
       outer.count = 0,
-      loglik      = loglik(S, diag(p)) - lambda * p
+      loglik      = loglik(S, diag(p))
     )
   }
   tol.outer <- tol*shr/(p-1)
@@ -69,7 +68,8 @@ ROptimPrimal <- function(
   max.inner.iter <- max.outer.iter * p
 
   p <- dim(Q)[1]
-  loglik_old <- loglik(S, Q) - lambda * sum(abs(Q)) # TODO: AC, are we sure we ant the sum(abs(Q))? not sum(abs(Q - diag(diag(Q))))?
+  browser()
+  loglik_old <- loglik(S, Q) - lambda * (sum(abs(Q)) - p) # diagonal of Q is 1
   loglik_vec <- rep(NA, max.outer.iter)
   loglik_vec[1] <- loglik_old
   loglik <- loglik_old
