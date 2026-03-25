@@ -68,7 +68,6 @@ ROptimPrimal <- function(
   max.inner.iter <- max.outer.iter * p
 
   p <- dim(Q)[1]
-  browser()
   loglik_old <- loglik(S, Q) - lambda * (sum(abs(Q)) - p) # diagonal of Q is 1
   loglik_vec <- rep(NA, max.outer.iter)
   loglik_vec[1] <- loglik_old
