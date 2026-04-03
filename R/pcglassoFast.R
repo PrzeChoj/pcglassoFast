@@ -115,12 +115,17 @@ pcglassoFast <- function(
   tol_R_curr <- 0.1
   times_tol_D_decrease <- 10
   times_tol_R_decrease <- 2
+  
+  start_time <- proc.time()
+  full_time_D_optim <- (proc.time() - start_time)[["elapsed"]]
+  
   while (!stop_loop && (length(objective_history)/2) < max_iter) {
     # D step
     if (verbose >= 5) {
       print("=== D step ===")
     }
     A <- C * R_symetric
+    start_time <- proc.time()
     D_result <- DOptim(
       A = A,
       d0 = D,
@@ -129,6 +134,7 @@ pcglassoFast <- function(
       max_ls_steps = max_iter_D_ls,
       alpha = alpha, diagonal_Newton = diagonal_Newton
     )
+    full_time_D_optim <- full_time_D_optim + (proc.time() - start_time)[["elapsed"]]
     proposed_objective <- function_to_optimize(R_symetric, D_result$D, C, lambda, alpha)
     if (verbose >= 2) {
       print(paste0("Iteration ", (length(objective_history) + 1)/2, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - objective_history[length(objective_history)], digits_to_print), ", after ", D_result$iter, " iters of D optim"))
@@ -216,7 +222,8 @@ pcglassoFast <- function(
     "R_inv" = R_inv,
     "n_iters" = floor(length(objective_history)/2),
     "objective" = objective_history,
-    "optimization_time" = optimization_time
+    "optimization_time" = optimization_time,
+    "full_time_D_optim" = full_time_D_optim
   )
 }
 
