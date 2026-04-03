@@ -1,11 +1,10 @@
 #' Optimize in R given D
-ROptim <- function(
+ROptimDual <- function(
     S,
     R,
     Rinv,
     lambda,
-    tol = 1e-4,
-    max_inner_iter = 10,
+    tol = 1e-8,
     max_outer_iter = 100) {
   if (is.null(Rinv)) {
     Rinv <- solve(R)
@@ -13,6 +12,7 @@ ROptim <- function(
 
   p <- dim(R)[1]
   stopifnot(p > 1)
+  max_inner_iter <- max_outer_iter * p
   lambda_matrix <- matrix(lambda, p, p); diag(lambda_matrix) <- 0
   ans <- ROptim_to_fortran(
     S,

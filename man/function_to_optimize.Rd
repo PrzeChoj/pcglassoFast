@@ -7,10 +7,10 @@
 function_to_optimize(R, d, C, lambda, alpha)
 }
 \description{
-In `ROptim()`, this function is maximized with respect to `R`.
+In `ROptimDual()`, this function is maximized with respect to `R`.
 In `DOptim()`, this function is maximized with respect to `D`.
 }
 \details{
-\eqn{function\_to\_optimize(R, D) = log(det(R)) + (1-\alpha)log(det(D^2)) - tr(DCDR) - \lambda ||R||_1}
-function, where \eqn{||R||_1} is only for off-diagonal elements.
+\eqn{function\_to\_optimize(R, D) = log(det(R)) + (1-\alpha)log(det(D^2)) - tr(DCDR) - \lambda ||R||_{1,off}}
+function, where \eqn{||R||_{1,off}} is only for off-diagonal elements.
 }

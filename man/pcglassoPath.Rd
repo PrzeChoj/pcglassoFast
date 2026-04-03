@@ -11,19 +11,20 @@ pcglassoPath(
   nlambda = 50,
   min_lambda_ratio = 0.01,
   max_edge_fraction = 1,
-  R0 = diag(nrow(S)),
+  R0 = .default_R0(S),
   R0_inv = solve(R0),
-  D0 = rep(1, nrow(S)),
-  max_iter = 500,
+  D0 = rep(1, nrow(S))/sqrt(diag(S)),
+  max_iter = 1000,
   tolerance = 0.001,
+  solver_R = c("dual", "primal"),
   tol_R = 1e-08,
-  max_iter_R_inner = 50000,
-  max_iter_R_outer = 10000,
+  max_iter_R = 100,
+  max_iter_R_outer = 5e+05,
   tol_D = 1e-08,
-  max_iter_D_newton = 500,
+  max_iter_D_newton = 5000,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
-  verbose = FALSE
+  verbose = 0
 )
 }
 \arguments{
@@ -46,7 +47,7 @@ the lambda‑path search stops early.}
 
 \item{D0}{(numeric vector of length p) initial diagonal entries; default is \code{rep(1,p)}.}
 
-\item{max_iter, tolerance, tol_R, max_iter_R_inner, max_iter_R_outer, tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=pcglassoFast]{pcglassoFast()}} for each \code{lambda}.}
+\item{max_iter, tolerance, tol_R, max_iter_R_outer, tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=pcglassoFast]{pcglassoFast()}} for each \code{lambda}.}
 }
 \value{
 A list with components:
@@ -55,7 +56,7 @@ A list with components:
 \item{\code{R_path}}{List of estimated correlation matrices \eqn{R}.}
 \item{\code{D_path}}{List of estimated diagonal matrices \eqn{D}.}
 \item{\code{W_path}}{List of full covariance estimates \eqn{D\,R\,D}.}
-\item{\code{loss}}{Numeric vector of final objective values at each \eqn{\lambda}.}
+\item{\code{objective}}{Numeric vector of final objective values at each \eqn{\lambda}.}
 }
 }
 \description{
@@ -78,10 +79,8 @@ alpha <- 4 / 20
 # get a small path of 20 lambdas but stop when >40\% edges
 resPath <- pcglassoPath(
   S, alpha,
-  nlambda = 20,
-  min_lambda_ratio = 0.01,
-  max_edge_fraction = 0.4,
-  verbose = TRUE
+  nlambda = 10,
+  verbose = 1
 )
 resPath
 }

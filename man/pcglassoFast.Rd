@@ -8,19 +8,20 @@ pcglassoFast(
   S,
   lambda,
   alpha,
-  R = diag(dim(S)[1]),
-  R_inv = solve(R),
-  D = rep(1, dim(S)[1]),
-  max_iter = 100,
+  R0 = .default_R0(S),
+  R0_inv = solve(R0),
+  D0 = rep(1, nrow(S))/sqrt(diag(S)),
+  max_iter = 1000,
   tolerance = 0.001,
+  solver_R = c("dual", "primal"),
   tol_R = 1e-08,
-  max_iter_R_inner = 50000,
-  max_iter_R_outer = 10000,
+  max_iter_R = 500,
+  max_iter_R_outer = 5e+05,
   tol_D = 1e-08,
-  max_iter_D_newton = 500,
+  max_iter_D_newton = 5000,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
-  verbose = FALSE
+  verbose = 0
 )
 }
 \arguments{
@@ -33,21 +34,29 @@ Parameters of the method. See Details section below.
 \item \eqn{\alpha} is a penalty for on-diagonal
 }}
 
-\item{R, R_inv}{(p x p matrix, unit diagonal) initial estimation of
+\item{R0, R0_inv}{(p x p matrix, unit diagonal) initial estimation of
 precision matrix (it is recommended to left it default).}
 
-\item{D}{(vector of length p) diagonal of initial estimation of diagonal
+\item{D0}{(vector of length p) diagonal of initial estimation of diagonal
 matrix (it is recommended to left it default).}
 
 \item{max_iter}{(integer) maximum number of iterations.}
 
 \item{tolerance}{(double) tolerance for convergence.}
 
-\item{tol_R, max_iter_R_inner, max_iter_R_outer}{Parameters passed to \code{\link[=ROptim]{ROptim()}} function.}
+\item{tol_R, max_iter_R_outer}{Parameters passed to \code{\link[=ROptimDual]{ROptimDual()}} function.}
 
 \item{tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=DOptim]{DOptim()}} function.}
 
-\item{verbose}{(boolian) print of loss.}
+\item{verbose}{(integer) print information about optimization process.
+\itemize{
+\item 0 -> no printing
+\item 1 -> information about why the optimization has ended
+\item 2 -> information about objective improvmenet
+\item 3 -> information about tolerance adaptation for D optimization
+\item 4 -> information about tolerance adaptation for R optimization
+\item 5 -> details about the R matrix optimization
+}}
 }
 \value{
 list of three elements:
@@ -81,8 +90,7 @@ S_inv.true <- diag(D.true) \%*\% R.true \%*\% diag(D.true)
 S <- solve(S_inv.true) # data
 
 alpha <- 4 / 20 # 4 / n, as in Carter's paper
-
-pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = TRUE)
+pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 3)
 }
 \seealso{
 \code{\link[=pcglassoPath]{pcglassoPath()}} to compute a full λ‑path of solutions

@@ -11,7 +11,7 @@
 #'   the lambda‑path search stops early.
 #' @param R0,R0_inv (p × p matrices) initial precision matrix and its inverse; defaults to \code{diag(p)}.
 #' @param D0 (numeric vector of length p) initial diagonal entries; default is \code{rep(1,p)}.
-#' @param max_iter,tolerance,tol_R,max_iter_R_inner,max_iter_R_outer,tol_D,max_iter_D_newton,max_iter_D_ls
+#' @param max_iter,tolerance,tol_R,max_iter_R_outer,tol_D,max_iter_D_newton,max_iter_D_ls
 #'         Parameters passed to [pcglassoFast()] for each \code{lambda}.
 #'
 #' @details
@@ -29,7 +29,7 @@
 #'   \item{\code{R_path}}{List of estimated correlation matrices \eqn{R}.}
 #'   \item{\code{D_path}}{List of estimated diagonal matrices \eqn{D}.}
 #'   \item{\code{W_path}}{List of full covariance estimates \eqn{D\,R\,D}.}
-#'   \item{\code{loss}}{Numeric vector of final objective values at each \eqn{\lambda}.}
+#'   \item{\code{objective}}{Numeric vector of final objective values at each \eqn{\lambda}.}
 #' }
 #'
 #' @seealso \code{\link{pcglassoFast}} for a single‑lambda blockwise optimizer.
@@ -48,10 +48,8 @@
 #' # get a small path of 20 lambdas but stop when >40% edges
 #' resPath <- pcglassoPath(
 #'   S, alpha,
-#'   nlambda = 20,
-#'   min_lambda_ratio = 0.01,
-#'   max_edge_fraction = 0.4,
-#'   verbose = TRUE
+#'   nlambda = 10,
+#'   verbose = 1
 #' )
 #' resPath
 pcglassoPath <- function(
@@ -62,32 +60,56 @@ pcglassoPath <- function(
     min_lambda_ratio = 0.01,
     max_edge_fraction = 1.0,
     # initial R, D (at the largest lambda)
-    R0 = diag(nrow(S)),
+    R0 = .default_R0(S),
     R0_inv = solve(R0),
-    D0 = rep(1, nrow(S)),
+    D0 = rep(1, nrow(S))/sqrt(diag(S)),
     # controls passed to pcglassoFast
-    max_iter = 500,
+    max_iter = 1000,
     tolerance = 1e-3,
+    solver_R = c("dual", "primal"),
     tol_R = 1e-8,
-    max_iter_R_inner = 50000,
-    max_iter_R_outer = 10000,
+    max_iter_R = 100,
+    max_iter_R_outer = 500000,
     tol_D = 1e-8,
-    max_iter_D_newton = 500,
+    max_iter_D_newton = 5000,
     max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
-    verbose = FALSE) {
+    verbose = 0) {
+  solver_R <- tolower(solver_R)
+  solver_R <- match.arg(solver_R)
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
+    all(is.finite(S)),
+    is.finite(mean(diag(S))),
+    mean(diag(S)) > 0)
+  R0 <- tryCatch(
+    R0,  # call promise
+    error = function(e) {
+      stop("Failed to compute R0 (default_R0 / user-supplied). ",
+           "Likely: S not invertible even after jitter, or invalid values. ",
+           "Original error: ", conditionMessage(e),
+           call. = FALSE)
+    }
+  )
+  stopifnot(
+    !is.null(R0),
     nrow(R0) == ncol(R0),
+    all(diag(R0) == 1),
     nrow(R0) == nrow(S),
     length(D0) == nrow(S),
+    all(is.finite(D0)), all(D0 > 0),
     is.numeric(alpha),
+    is.numeric(nlambda), nlambda >= 1,
+    is.numeric(tolerance), tolerance > 0,
+    max_iter >= 1,
     is.null(lambdas) || is.numeric(lambdas),
     min_lambda_ratio >= 0 && min_lambda_ratio <= 1,
     max_edge_fraction >= 0 && max_edge_fraction <= 1,
-    length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton)
+    length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton),
+    verbose %in% 0:5 # can be TRUE (1) or FALSE (0)
   )
+  path_time_start <- Sys.time()
 
   p <- nrow(S)
   if (is.null(R0_inv)) R0_inv <- solve(R0)
@@ -102,7 +124,7 @@ pcglassoPath <- function(
   # prepare storage
   K <- length(lambdas)
   outW <- outWi <- outD <- outR <- outRi <- vector("list", K)
-  losses <- iters <- numeric(K)
+  objective_values <- iters <- numeric(K)
 
   # warm start
   R_curr <- R0
@@ -110,23 +132,24 @@ pcglassoPath <- function(
   D_curr <- D0
 
   for (k in 1:K) {
-    if (verbose) {
-      print(paste0("Path iteration: ", k))
-    }
     lambda_k <- lambdas[k]
+    if (verbose != 0) {
+      message(paste0("Path iteration: ", k, " of ", K, "; lambda = ", round(lambda_k, 3)))
+    }
 
     # run full blockwise optimization at this lambda
     fit <- pcglassoFast(
       S = S,
       lambda = lambda_k,
       alpha = alpha,
-      R = R_curr,
-      R_inv = Rinv_curr,
+      R0 = R_curr,
+      R0_inv = Rinv_curr,
       D = D_curr,
       max_iter = max_iter,
       tolerance = tolerance,
+      solver_R = solver_R,
       tol_R = tol_R,
-      max_iter_R_inner = max_iter_R_inner,
+      max_iter_R = max_iter_R,
       max_iter_R_outer = max_iter_R_outer,
       tol_D = tol_D,
       max_iter_D_newton = max_iter_D_newton,
@@ -147,13 +170,18 @@ pcglassoPath <- function(
     outW[[k]] <- R_curr * (D_curr %o% D_curr)
     outWi[[k]] <- Rinv_curr * ((1/D_curr) %o% (1/D_curr))
     iters[k] <- fit$n_iters
-    losses[k] <- utils::tail(fit$loss, 1)
-
+    objective_values[k] <- utils::tail(fit$objective, 1)
     # compute edge fraction and early stop
     edge_frac <- (sum(R_curr != 0) - p) / (p * (p - 1))
     if (edge_frac > max_edge_fraction) {
       break
     }
+  }
+
+  path_time_end <- Sys.time()
+  path_time_full <- path_time_end - path_time_start
+  if (verbose >= 1) {
+    print(paste0("Path took ", round(path_time_full, 3), " ", attr(path_time_full, "units")))
   }
 
   # trim to actual length
@@ -164,7 +192,7 @@ pcglassoPath <- function(
   outD <- outD[used]
   outW <- outW[used]
   outWi <- outWi[used]
-  losses <- losses[used]
+  objective_values <- objective_values[used]
   iters <- iters[used]
 
   names(outR) <- names(outD) <- names(outW) <- paste0("lam_", round(lambdas, 4))
@@ -175,16 +203,17 @@ pcglassoPath <- function(
     D_path = outD,
     W_path = outW,
     Wi_path = outWi,
-    loss = losses,
-    iters = iters
+    objective = objective_values,
+    iters = iters,
+    path_optimization_time = path_time_full
   )
 }
 
 
-#' Loss evaluation
+#' Objective function evaluation
 #'
 #' @description
-#' computes the loss for the solution of the pcglassoPath, or a list or an array of
+#' computes the objective for the solution of the pcglassoPath, or a list or an array of
 #' matrices
 #' the BIC_gamma is from Extended Bayesian Information Criteria for Gaussian
 #' Graphical Models
@@ -199,7 +228,7 @@ pcglassoPath <- function(
 #'
 #' @importFrom methods is
 #' @export
-evaluate_loss_path <- function(precision_array, Sigma, n, gamma = 0.5) {
+evaluate_objective_path <- function(precision_array, Sigma, n, gamma = 0.5) {
   if ("list" %in% methods::is(precision_array)) {
     W <- precision_array$W_path
     precision_array <- simplify2array(W)
