@@ -27,7 +27,7 @@ void updateBeta(arma::vec& beta, const arma::mat& Qinv_ii, arma::vec& Qinv_beta,
     double b = Qinv_beta(j) - Qinv_ii(j, j) * beta(j);
     updateBtQb_cpp(c, Qinv_beta(j), beta(j), a);
     double xi;
-    if(c>1){
+    if(c>=1){
       xi = -b;
     }else{
       xi =  -b / (1 - c) - s(j);
