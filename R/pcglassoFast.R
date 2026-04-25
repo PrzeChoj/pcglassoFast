@@ -62,7 +62,7 @@ pcglassoFast <- function(
     max_iter = 1000, tolerance = 1e-3,
     solver_R = c("dual", "primal"),
     tol_R = 1e-8,
-    max_iter_R = 500, max_iter_R_outer = 500000,
+    max_iter_R = 100, max_iter_R_outer = 500000,
     tol_D = 1e-8,
     max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
