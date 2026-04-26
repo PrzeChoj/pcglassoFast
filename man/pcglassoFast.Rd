@@ -15,7 +15,7 @@ pcglassoFast(
   tolerance = 0.001,
   solver_R = c("dual", "primal"),
   tol_R = 1e-08,
-  max_iter_R = 500,
+  max_iter_R = 100,
   max_iter_R_outer = 5e+05,
   tol_D = 1e-08,
   max_iter_D_newton = 5000,
