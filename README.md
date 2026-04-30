@@ -1,12 +1,20 @@
 # pcglassoFast
 `pcglassoFast`: Fast Partial Correlation Graphical LASSO
 
-You can install it directly from GitHub through devtools:
+You can install it from a local directory:
 
 ```r
 library(devtools)
 
-install_github("PrzeChoj/pcglassoFast")
+install_local("/path/to/pcglassoFast")
+```
+
+Alternatively, if you have access to GitHub:
+
+```r
+library(devtools)
+
+install_github("anonymous/pcglassoFast")
 ```
 
 Note that you may need to install additional compilation tools to build the C++ and Fortran code included in the package. On Windows, this usually requires [Rtools](https://cran.r-project.org/bin/windows/Rtools/). On macOS, see the [R for macOS tools](https://mac.r-project.org/tools/) page.
@@ -41,7 +49,7 @@ K.true
 ```
 
 ## **Report an issue**
-Any bugs encountered when using the package can be reported [here](https://github.com/PrzeChoj/pcglassoFast/issues).
+Any bugs encountered when using the package can be reported [here](https://github.com/anonymous/pcglassoFast/issues).
 
 ## **Notes**
 Part of the code (`ROptimDual()` and the Fortran code) was adapted from the `glassoFast` package: <https://github.com/JClavel/glassoFast>.
@@ -51,23 +59,11 @@ Part of the code (`ROptimDual()` and the Fortran code) was adapted from the `gla
 If you use `pcglassoFast`, please cite both the package and the paper describing the method and algorithms:
 
 ```bibtex
-@misc{chojeckiwallin2025pcglassofast,
+@misc{anonymous2025pcglassofast,
   title  = {{pcglassoFast}: Fast Partial Correlation Graphical LASSO},
-  author = {Chojecki, Adam and Wallin, Jonas},
+  author = {[Anonymous et al.]},
   year   = {2025},
-  url    = {https://github.com/PrzeChoj/pcglassoFast},
+  url    = {https://github.com/anonymous/pcglassoFast},
   note   = {R package}
-}
-```
-
-```bibtex
-@misc{bogdan2025identifying,
-  title         = {Identifying Network Hubs with the Partial Correlation Graphical LASSO},
-  author        = {Bogdan, Małgorzata and Chojecki, Adam and Hejný, Ivan and Kołodziejek, Bartosz and Wallin, Jonas},
-  year          = {2025},
-  eprint        = {2508.12258},
-  archivePrefix = {arXiv},
-  primaryClass  = {math.ST},
-  url           = {https://arxiv.org/abs/2508.12258}
 }
 ```
