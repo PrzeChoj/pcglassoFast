@@ -3,14 +3,13 @@ Package: pcglassoFast
 Title: Fast Partial Correlation Graphical LASSO
 Version: 0.4.0
 Authors@R: c(
-    person(c("Adam", "Przemysław"), "Chojecki", , "adam.prze.choj@gmail.com", role = c("aut", "cre"),
-           comment = c(ORCID = "0009-0008-2902-4096")),
-    person("Jonas", "Wallin", , "jonas.wallin81@gmail.com", role = "aut")
+    person("Anonymous", "Author A", role = c("aut", "cre")),
+    person("Anonymous", "Author B", role = "aut")
   )
 Description: A fast and improved implementation of the Partial Correlation
     graphical LASSO.
 License: GPL (>= 3)
-URL: https://github.com/PrzeChoj/pcglassoFast
+URL: https://github.com/anonymous/pcglassoFast
 Depends: 
     R (>= 3.5)
 Imports: 
