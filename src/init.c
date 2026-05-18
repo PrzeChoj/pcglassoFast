@@ -12,6 +12,7 @@ extern SEXP _pcglassoFast_updateLoopCpp(void *, void *, void *, void *, void *, 
 
 /* .Fortran calls */
 extern void F77_NAME(roptim)(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+extern void F77_NAME(box_qp_f)(void *, void *, void *, void *, void *, void *, void *, void *);
 
 static const R_CallMethodDef CallEntries[] = {
     {"_pcglassoFast_Qinv_down_cpp",   (DL_FUNC) &_pcglassoFast_Qinv_down_cpp,   2},
@@ -23,7 +24,8 @@ static const R_CallMethodDef CallEntries[] = {
 };
 
 static const R_FortranMethodDef FortranEntries[] = {
-    {"roptim", (DL_FUNC) &F77_NAME(roptim), 13},
+    {"roptim",   (DL_FUNC) &F77_NAME(roptim),   13},
+    {"box_qp_f", (DL_FUNC) &F77_NAME(box_qp_f), 8},
     {NULL, NULL, 0}
 };
 

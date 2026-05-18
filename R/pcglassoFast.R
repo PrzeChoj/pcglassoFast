@@ -60,7 +60,7 @@ pcglassoFast <- function(
     R0_inv = solve(R0),
     D0 = rep(1, nrow(S))/sqrt(diag(S)),
     max_iter = 1000, tolerance = 1e-3,
-    solver_R = c("dual", "primal"),
+    solver_R = c("dual", "primal", "primal_dual"),
     tol_R = 1e-8,
     max_iter_R = 100, max_iter_R_outer = 500000,
     tol_D = 1e-8,
@@ -159,7 +159,8 @@ pcglassoFast <- function(
     R_step <- switch(
       solver_R,
       "dual" = R_step_dual,
-      "primal" = R_step_primal
+      "primal" = R_step_primal,
+      "primal_dual" = R_step_primalDual
     )
     R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
 
@@ -330,6 +331,46 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
     R_inv = resR$Rinv,
     proposed_objective = proposed_objective,
     iterations_done = iterations_in_dual_done
+  )
+}
+
+
+R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
+  digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
+  p <- dim(C)[1]
+
+  S_for_primal_dual <- C * (D %o% D)
+
+  resR <- ROptimPrimalDual(
+    S = S_for_primal_dual,
+    R = R_curr,
+    U = NULL,
+    lambda = lambda,
+    outer.Maxiter = max_iter_R_outer,
+    outer.tol = tol_R_curr,
+    qp.Maxiter = max_iter_R,
+    qp.tol = 1e-7,
+    obj.seq = FALSE
+  )
+
+  if (any(is.nan(resR$Rinv)) | any(is.nan(resR$R_symetric))) {
+    warn("NaNs introduced in primal-dual calculations")
+    return()
+  }
+
+  proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+  iterations_done <- resR$outer.count
+
+  if (verbose >= 2) {
+    print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_done, " iters of R optim"))
+  }
+
+  list(
+    R = resR$R_symetric,
+    R_symetric = resR$R_symetric,
+    R_inv = resR$Rinv,
+    proposed_objective = proposed_objective,
+    iterations_done = iterations_done
   )
 }
 
