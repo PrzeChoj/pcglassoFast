@@ -140,7 +140,7 @@ ROptimPrimalDual <-
     result <- list(
       R = R,
       R_symetric = R_symetric,
-      Rinv = solve(R_symetric),
+      Rinv = NULL,
       dual_box = U,
       outer.count = outer.iter,
       time.counter.QP = time.counter.QP,
