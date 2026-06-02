@@ -2,19 +2,34 @@
 #'
 #' Reconstruct covariance(s) from correlation(s) plus variances.
 #'
-#' @param C A numeric correlation matrix (p×p) or an array of shape p×p×k.
-#'   Each slice C[,,i] must be a valid correlation matrix (1's on the diagonal).
-#' @param diagSigma Either
-#'   - a numeric vector of length p (variances for each variable),
-#'   - or a numeric matrix p×k (variances for each slice).
-#'   If \code{C} is 2D, only the length-p option is used.
+#' This function inverts the transformation performed by \code{\link[stats]{cov2cor}}.
+#' Given a correlation matrix C (with unit diagonal) and a vector (or matrix) of
+#' variances, it reconstructs the corresponding covariance matrix via the transformation
+#' \eqn{Sigma = D C D}, where \eqn{D = diag(sqrt(variances))}.
 #'
-#' @return If \code{C} is 2D, a p×p covariance matrix
-#'   \eqn{\Sigma = D\,C\,D}, where \eqn{D = \mathrm{diag}(\sqrt{\mathrm{diagSigma}})}.
-#'   If \code{C} is 3D (p×p×k), returns a p×p×k array of \eqn{\Sigma^{(i)}}.
+#' @param C A numeric correlation matrix (p x p) or an array of shape p x p x k.
+#'   Each slice C[,,i] must be a valid correlation matrix (1 on the diagonal).
+#' @param diagSigma Either:
+#'   - a numeric vector of length p (variances for each variable; applied to all k slices if C is 3D),
+#'   - or a numeric matrix p x k (slice-specific variances; must match dimensions of C).
+#'   If \code{C} is 2D, only the length-p vector form is used.
+#'
+#' @details
+#' The transformation formula is:
+#' \deqn{Sigma = D C D}
+#' where \eqn{D = diag(sqrt(v_1), ..., sqrt(v_p))} is the diagonal matrix of
+#' standard deviations derived from variances.
+#'
+#' @return If \code{C} is 2D, a p x p covariance matrix
+#'   \eqn{Sigma = D C D}, where \eqn{D = diag(sqrt(diagSigma))}.
+#'   If \code{C} is 3D (p x p x k), returns a p x p x k array of covariance matrices.
+#'
+#' @seealso
+#' \code{\link[stats]{cov2cor}} for the forward transformation.
+#' \code{\link{pcglassoFast}} for the PCGLASSO solver (output includes \code{R} and \code{D}).
 #'
 #' @examples
-#' # 2D example
+#' # 2D example: recover covariance from correlation + variances
 #' Sigma <- matrix(c(4, 1.2, 1.2, 9), 2, 2)
 #' C <- cov2cor(Sigma)
 #' Sigma2 <- cov2cor_inv(C, diag(Sigma))
@@ -25,18 +40,16 @@
 #' C3[, , 1] <- diag(2)
 #' C3[, , 2] <- cov2cor(Sigma)
 #' S3 <- cov2cor_inv(C3, diag(Sigma))
-#' dim(S3) # 2 2 2
 #'
-#' # 3D with slice‐specific variances
-#' vars <- cbind(c(4, 9), c(1, 16)) # 2×2: first slice variances (4,9), second (1,16)
+#' # 3D with slice-specific variances
+#' vars <- cbind(c(4, 9), c(1, 16)) # 2x2: first slice vars (4,9), second (1,16)
 #' S4 <- cov2cor_inv(C3, vars)
-#' all(dim(S4) == c(2, 2, 2))
 #'
 #' @export
 cov2cor_inv <- function(C, diagSigma) {
   # check C
   if (!is.numeric(C) || length(dim(C)) < 2 || dim(C)[1] != dim(C)[2]) {
-    stop("`C` must be a numeric p×p matrix or p×p×k array.")
+    stop("`C` must be a numeric p x p matrix or p x p x k array.")
   }
   p <- dim(C)[1]
   k <- if (length(dim(C)) == 3) dim(C)[3] else 1L
@@ -44,12 +57,12 @@ cov2cor_inv <- function(C, diagSigma) {
   # check diagSigma
   if (is.matrix(diagSigma)) {
     if (!all(dim(diagSigma) == c(p, k))) {
-      stop("`diagSigma` must be length p (vector) or a p×k matrix when C has k slices.")
+      stop("`diagSigma` must be length p (vector) or a p x k matrix when C has k slices.")
     }
     vars_mat <- diagSigma
   } else {
     if (!is.numeric(diagSigma) || length(diagSigma) != p) {
-      stop("`diagSigma` must be a vector of length p or a p×k matrix matching C.")
+      stop("`diagSigma` must be a vector of length p or a p x k matrix matching C.")
     }
     # replicate the same variances across k slices
     vars_mat <- matrix(diagSigma, nrow = p, ncol = k)
@@ -83,24 +96,66 @@ cov2cor_inv <- function(C, diagSigma) {
 
 #' Compare two symmetric matrices via Frobenius norms, RMSE, and error rates
 #'
-#' Given a true symmetric matrix Q and its estimate Q_est (both p×p),
-#' this function computes:
-#' 1. `frob_norm`: overall Frobenius norm \(\|Q_est - Q\|_F\).
-#' 2. `rmse`: root-mean-square error per element: \(\sqrt{\sum_{i,j}(Q_est - Q)^2 / p^2}\).
-#' 3. `frob_diag`: Frobenius norm of diagonal differences.
-#' 4. `rmse_diag`: RMSE on diagonal: \(\sqrt{\sum_{i}(Q_est_{ii} - Q_{ii})^2 / p}\).
-#' 5. `frob_offdiag_zero`: Frobenius norm on off-diagonal entries where Q_{ij} == 0.
-#' 6. `rmse_offdiag_zero`: RMSE on those off-diagonal zero entries: divide by number of such pairs.
-#' 7. `frob_offdiag_nonzero`: Frobenius norm on off-diagonal entries where Q_{ij} != 0.
-#' 8. `rmse_offdiag_nonzero`: RMSE on those off-diagonal nonzero entries.
-#' 9. `false_pos_rate`: proportion of truly-zero entries with Q_est != 0.
-#' 10. `false_neg_rate`: proportion of truly-nonzero entries with Q_est == 0.
+#' Given a true symmetric matrix Q and its estimate Q_est (both p x p),
+#' this function computes a comprehensive set of accuracy and sparsity metrics.
+#' It is designed to evaluate the quality of estimated precision matrices (or other
+#' symmetric matrices) relative to their ground truth.
 #'
-#' @param Q Numeric p×p symmetric matrix of true values.
-#' @param Q_est Numeric p×p symmetric matrix of estimates; must match dims of Q.
-#' @return A one-row `data.frame` with the above metrics.
+#' @param Q Numeric p x p symmetric matrix of true values.
+#' @param Q_est Numeric p x p symmetric matrix of estimates; must match dims of Q.
+#'
+#' @details
+#' The function computes 12 metrics, grouped by type:
+#'
+#' \strong{Overall reconstruction error:}
+#' \itemize{
+#'   \item `frob_norm`: Frobenius norm of the difference matrix.
+#'         Formula: \eqn{||Q\_est - Q||_F = sqrt(sum((Q\_est - Q)^2))}{||Q_est - Q||_F}
+#'   \item `rmse`: Root-mean-square error per element.
+#'         Formula: \eqn{sqrt(sum((Q\_est - Q)^2) / p^2)}{sqrt(sum((Q_est - Q)^2) / p^2)}
+#' }
+#'
+#' \strong{Diagonal accuracy:}
+#' \itemize{
+#'   \item `frob_diag`: Frobenius norm of diagonal differences only.
+#'   \item `rmse_diag`: RMSE on diagonal elements.
+#'         Formula: \eqn{sqrt(sum((Q\_est[i,i] - Q[i,i])^2) / p)}{sqrt(sum((Q_est[i,i] - Q[i,i])^2) / p)}
+#' }
+#'
+#' \strong{Off-diagonal zeros (sparsity pattern):}
+#' \itemize{
+#'   \item `frob_offdiag_zero`: Frobenius norm on off-diagonal entries where Q[i,j] = 0 (true zeros).
+#'   \item `rmse_offdiag_zero`: RMSE on true zeros (divided by count of true zeros).
+#'   \item `true_non0_rate`: Proportion of true zeros correctly estimated as zero.
+#'         Formula: \eqn{P(Q\_est[i,j] = 0 | Q[i,j] = 0)}{P(Q_est[i,j] = 0 | Q[i,j] = 0)}
+#'         (Higher is better.)
+#'   \item `false_non0_rate`: Proportion of true zeros incorrectly estimated as nonzero.
+#'         Formula: \eqn{P(Q\_est[i,j] != 0 | Q[i,j] = 0)}{P(Q_est[i,j] != 0 | Q[i,j] = 0)}
+#'         (Lower is better; false positives in the sparsity pattern.)
+#' }
+#'
+#' \strong{Off-diagonal nonzeros (edge recovery):}
+#' \itemize{
+#'   \item `frob_offdiag_nonzero`: Frobenius norm on off-diagonal entries where Q[i,j] != 0 (true edges).
+#'   \item `rmse_offdiag_nonzero`: RMSE on true nonzero entries.
+#'   \item `true_0_rate`: Proportion of true nonzeros correctly estimated as nonzero.
+#'         Formula: \eqn{P(Q\_est[i,j] != 0 | Q[i,j] != 0)}{P(Q_est[i,j] != 0 | Q[i,j] != 0)}
+#'         (Higher is better; sensitivity/power.)
+#'   \item `false_0_rate`: Proportion of true nonzeros incorrectly estimated as zero.
+#'         Formula: \eqn{P(Q\_est[i,j] = 0 | Q[i,j] != 0)}{P(Q_est[i,j] = 0 | Q[i,j] != 0)}
+#'         (Lower is better; false negatives in the sparsity pattern.)
+#' }
+#'
+#' @return A one-row `data.frame` with columns: `frob_norm`, `rmse`, `frob_diag`, `rmse_diag`,
+#'   `frob_offdiag_zero`, `rmse_offdiag_zero`, `frob_offdiag_nonzero`, `rmse_offdiag_nonzero`,
+#'   `true_non0_rate`, `false_non0_rate`, `true_0_rate`, `false_0_rate`.
+#'
+#' @seealso
+#' \code{\link{irrepPCGLASSO}}, \code{\link{irrepGLASSO}} for theoretical recovery guarantees.
+#' \code{\link{pcglassoFast}}, \code{\link{pcglassoPath}} for PCGLASSO estimation.
+#' \code{\link{evaluate_objective_path}} for model selection metrics along a regularization path.
+#'
 #' @examples
-#' set.seed(1)
 #' p <- 5
 #' M <- matrix(rnorm(p^2), p, p)
 #' Q <- (M + t(M)) / 2
@@ -111,7 +166,6 @@ cov2cor_inv <- function(C, diagSigma) {
 #' E <- (E + t(E)) / 2
 #' E[2, 4] <- E[4, 2] <- 0 # drop one entry
 #' compare_matrices(Q, E)
-#' @md
 #' @export
 compare_matrices <- function(Q, Q_est) {
   if (!is.matrix(Q) || !is.matrix(Q_est) || any(dim(Q) != dim(Q_est))) {

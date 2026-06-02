@@ -7,31 +7,64 @@
 compare_matrices(Q, Q_est)
 }
 \arguments{
-\item{Q}{Numeric p×p symmetric matrix of true values.}
+\item{Q}{Numeric p x p symmetric matrix of true values.}
 
-\item{Q_est}{Numeric p×p symmetric matrix of estimates; must match dims of Q.}
+\item{Q_est}{Numeric p x p symmetric matrix of estimates; must match dims of Q.}
 }
 \value{
-A one-row \code{data.frame} with the above metrics.
+A one-row `data.frame` with columns: `frob_norm`, `rmse`, `frob_diag`, `rmse_diag`,
+  `frob_offdiag_zero`, `rmse_offdiag_zero`, `frob_offdiag_nonzero`, `rmse_offdiag_nonzero`,
+  `true_non0_rate`, `false_non0_rate`, `true_0_rate`, `false_0_rate`.
 }
 \description{
-Given a true symmetric matrix Q and its estimate Q_est (both p×p),
-this function computes:
-\enumerate{
-\item \code{frob_norm}: overall Frobenius norm \(\|Q_est - Q\|_F\).
-\item \code{rmse}: root-mean-square error per element: \(\sqrt{\sum_{i,j}(Q_est - Q)^2 / p^2}\).
-\item \code{frob_diag}: Frobenius norm of diagonal differences.
-\item \code{rmse_diag}: RMSE on diagonal: \(\sqrt{\sum_{i}(Q_est_{ii} - Q_{ii})^2 / p}\).
-\item \code{frob_offdiag_zero}: Frobenius norm on off-diagonal entries where Q_{ij} == 0.
-\item \code{rmse_offdiag_zero}: RMSE on those off-diagonal zero entries: divide by number of such pairs.
-\item \code{frob_offdiag_nonzero}: Frobenius norm on off-diagonal entries where Q_{ij} != 0.
-\item \code{rmse_offdiag_nonzero}: RMSE on those off-diagonal nonzero entries.
-\item \code{false_pos_rate}: proportion of truly-zero entries with Q_est != 0.
-\item \code{false_neg_rate}: proportion of truly-nonzero entries with Q_est == 0.
+Given a true symmetric matrix Q and its estimate Q_est (both p x p),
+this function computes a comprehensive set of accuracy and sparsity metrics.
+It is designed to evaluate the quality of estimated precision matrices (or other
+symmetric matrices) relative to their ground truth.
+}
+\details{
+The function computes 12 metrics, grouped by type:
+
+\strong{Overall reconstruction error:}
+\itemize{
+  \item `frob_norm`: Frobenius norm of the difference matrix.
+        Formula: \eqn{||Q\_est - Q||_F = sqrt(sum((Q\_est - Q)^2))}{||Q_est - Q||_F}
+  \item `rmse`: Root-mean-square error per element.
+        Formula: \eqn{sqrt(sum((Q\_est - Q)^2) / p^2)}{sqrt(sum((Q_est - Q)^2) / p^2)}
+}
+
+\strong{Diagonal accuracy:}
+\itemize{
+  \item `frob_diag`: Frobenius norm of diagonal differences only.
+  \item `rmse_diag`: RMSE on diagonal elements.
+        Formula: \eqn{sqrt(sum((Q\_est[i,i] - Q[i,i])^2) / p)}{sqrt(sum((Q_est[i,i] - Q[i,i])^2) / p)}
+}
+
+\strong{Off-diagonal zeros (sparsity pattern):}
+\itemize{
+  \item `frob_offdiag_zero`: Frobenius norm on off-diagonal entries where Q[i,j] = 0 (true zeros).
+  \item `rmse_offdiag_zero`: RMSE on true zeros (divided by count of true zeros).
+  \item `true_non0_rate`: Proportion of true zeros correctly estimated as zero.
+        Formula: \eqn{P(Q\_est[i,j] = 0 | Q[i,j] = 0)}{P(Q_est[i,j] = 0 | Q[i,j] = 0)}
+        (Higher is better.)
+  \item `false_non0_rate`: Proportion of true zeros incorrectly estimated as nonzero.
+        Formula: \eqn{P(Q\_est[i,j] != 0 | Q[i,j] = 0)}{P(Q_est[i,j] != 0 | Q[i,j] = 0)}
+        (Lower is better; false positives in the sparsity pattern.)
+}
+
+\strong{Off-diagonal nonzeros (edge recovery):}
+\itemize{
+  \item `frob_offdiag_nonzero`: Frobenius norm on off-diagonal entries where Q[i,j] != 0 (true edges).
+  \item `rmse_offdiag_nonzero`: RMSE on true nonzero entries.
+  \item `true_0_rate`: Proportion of true nonzeros correctly estimated as nonzero.
+        Formula: \eqn{P(Q\_est[i,j] != 0 | Q[i,j] != 0)}{P(Q_est[i,j] != 0 | Q[i,j] != 0)}
+        (Higher is better; sensitivity/power.)
+  \item `false_0_rate`: Proportion of true nonzeros incorrectly estimated as zero.
+        Formula: \eqn{P(Q\_est[i,j] = 0 | Q[i,j] != 0)}{P(Q_est[i,j] = 0 | Q[i,j] != 0)}
+        (Lower is better; false negatives in the sparsity pattern.)
 }
 }
 \examples{
-set.seed(1)
 p <- 5
 M <- matrix(rnorm(p^2), p, p)
 Q <- (M + t(M)) / 2
@@ -42,4 +75,9 @@ E <- Q + matrix(rnorm(p^2, 0, 0.1), p, p)
 E <- (E + t(E)) / 2
 E[2, 4] <- E[4, 2] <- 0 # drop one entry
 compare_matrices(Q, E)
+}
+\seealso{
+\code{\link{irrepPCGLASSO}}, \code{\link{irrepGLASSO}} for theoretical recovery guarantees.
+\code{\link{pcglassoFast}}, \code{\link{pcglassoPath}} for PCGLASSO estimation.
+\code{\link{evaluate_objective_path}} for model selection metrics along a regularization path.
 }

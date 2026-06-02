@@ -124,8 +124,8 @@ This exponential spacing is more appropriate for graphical lasso-type problems t
 p <- 7
 n <- 40
 R.true <- diag(1, p, p)
-R.true[1, 2:p] <- 1/sqrt(p)
-R.true[2:p, 1] <- 1/sqrt(p)
+R.true[1, 2:p] <- -1/sqrt(p)
+R.true[2:p, 1] <- -1/sqrt(p)
 D.true <- sqrt(rchisq(p, 3))
 S_inv.true <- diag(D.true) \%*\% R.true \%*\% diag(D.true)
 Z <- MASS::mvrnorm(n, rep(0, p), solve(S_inv.true))

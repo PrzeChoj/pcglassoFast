@@ -65,15 +65,15 @@
 #' p <- 7
 #' n <- 40
 #' R.true <- diag(1, p, p)
-#' R.true[1, 2:p] <- 1/sqrt(p)
-#' R.true[2:p, 1] <- 1/sqrt(p)
+#' R.true[1, 2:p] <- -1/sqrt(p)
+#' R.true[2:p, 1] <- -1/sqrt(p)
 #' D.true <- sqrt(rchisq(p, 3))
 #' S_inv.true <- diag(D.true) %*% R.true %*% diag(D.true)
 #' Z <- MASS::mvrnorm(n, rep(0, p), solve(S_inv.true))
 #' S <- cov(Z)
 #'
 #' # Fit PCGLASSO
-#' result <- pcglassoFast(S, lambda = 0.7, alpha = 0, verbose = 1)
+#' result <- pcglassoFast(S, lambda = 0.6, alpha = 0, verbose = 1)
 pcglassoFast <- function(
     S, lambda, alpha,
     R0 = .default_R0(S),
