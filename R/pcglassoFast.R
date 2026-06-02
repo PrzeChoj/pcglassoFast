@@ -1,59 +1,79 @@
-#' blockwise optimization for pcglasso
+#' Partial Correlation Graphical LASSO via Blockwise Coordinate Descent
 #'
-#' @param S (p x p matrix) empirical covariance matrix derived from the data.
-#' @param lambda,alpha (double \eqn{0\le\lambda}, double \eqn{\alpha \in \mathbb{R}})
-#'         Parameters of the method. See Details section below.
-#'   * \eqn{\lambda} is a penalty for off-diagonal
-#'   * \eqn{\alpha} is a penalty for on-diagonal
-#' @param R0,R0_inv (p x p matrix, unit diagonal) initial estimation of
-#'         precision matrix (it is recommended to left it default).
-#' @param D0 (vector of length p) diagonal of initial estimation of diagonal
-#'         matrix (it is recommended to left it default).
-#' @param max_iter (integer) maximum number of iterations.
-#' @param tolerance (double) tolerance for convergence.
-#' @param tol_R,max_iter_R_outer
-#'         Parameters passed to [ROptimDual()] function.
-#' @param tol_D,max_iter_D_newton,max_iter_D_ls
-#'         Parameters passed to [DOptim()] function.
-#' @param verbose (integer) print information about optimization process.
-#'   * 0 -> no printing
-#'   * 1 -> information about why the optimization has ended
-#'   * 2 -> information about objective improvmenet
-#'   * 3 -> information about tolerance adaptation for D optimization
-#'   * 4 -> information about tolerance adaptation for R optimization
-#'   * 5 -> details about the R matrix optimization
+#' Estimate sparse precision matrices by maximizing the PCGLASSO objective using
+#' blockwise coordinate descent. Decouples correlation (R) and variance (D) estimation
+#' with independent sparsity penalties.
+#'
+#' @param S (p x p matrix) Empirical covariance matrix.
+#' @param lambda (double >= 0) Sparsity penalty on off-diagonal elements of correlation matrix R.
+#' @param alpha (double, \eqn{\alpha < 1}) Penalty on diagonal scaling (variance estimation).
+#'   Must be strictly less than 1. Can be negative; typical value: \code{4/n} (n = sample size).
+#' @param R0,R0_inv (p x p matrix) Initial correlation matrix and its inverse
+#'   (unit diagonal). Leave at defaults unless providing warm-start solution.
+#' @param D0 (numeric vector, length p) Initial diagonal scaling vector.
+#'   Should be left at default unless providing a warm-start solution.
+#' @param max_iter (integer) Maximum iterations of outer blockwise loop.
+#' @param tolerance (double > 0) Outer loop convergence threshold; stops when
+#'   objective improvement in a single iteration < tolerance.
+#' @param solver_R (character) Optimization method for R-step: \code{"dual"} (Fortran,
+#'   default) or \code{"primal"} (C++, alternative).
+#' @param tol_R (double > 0) Inner convergence tolerance for R-step optimization.
+#' @param max_iter_R (integer) Maximum iterations for inner R-step solver.
+#' @param max_iter_R_outer (integer) Maximum iterations for R-step dual solver.
+#' @param tol_D (double > 0) Inner convergence tolerance for D-step optimization.
+#' @param max_iter_D_newton (integer) Maximum Newton-Raphson steps in D optimization.
+#' @param max_iter_D_ls (integer) Maximum line search steps in D optimization.
+#' @param diagonal_Newton (logical) Use full Hessian (TRUE, default) or diagonal
+#'   approximation (FALSE) in D-step Newton method.
+#' @param verbose (integer, 0--5) Logging detail. 0 = silent; 1 = termination reason;
+#'   2 = objective; 3--4 = tolerance adaptation; 5 = detailed R-step diagnostics.
 #'
 #' @details
-#' The function maximizes the
-#' \eqn{f(R, D) = log(det(R)) + (1-\alpha)log(det(D^2)) - tr(DSDR) - \lambda ||R||_1}
-#' function, where \eqn{||R||_1} is only for off-diagonal elements.
+#' \strong{Objective Function:}
 #'
-#' The function employs coordinate descent,
-#' also known as blockwise optimization,
-#' to iteratively optimize the variables `R` and `D`
-#' while fixing the other variable.
-#' It continues this process until convergence or
-#' until the maximum number of iterations is reached.
+#' Maximizes \eqn{f(R, D) = log(det(R)) + (1 - alpha) * log(det(D^2)) - trace(DSDR) - lambda ||R||_1}
 #'
-#' @return list of three elements:
-#' * "R" - found correlation matrix
-#' * "D" - found diagonal matrix
-#' * "n_iters" - number of iterations of the outer loop
-#' @md
+#' where \eqn{||R||_1} denotes the L1-norm of off-diagonal elements only, and
+#' W = DRD is the resulting covariance estimate.
 #'
-#' @seealso [pcglassoPath()] to compute a full λ‑path of solutions
+#' The objective is bi-concave: f(R, D_fixed) is concave in R, and f(R_fixed, D) is concave in D.
+#' This property justifies the blockwise coordinate descent algorithm.
+#'
+#' \strong{Blockwise coordinate descent algorithm:}
+#'
+#' Alternates between D-step (diagonal optimization via Newton-Raphson) and R-step
+#' (correlation optimization via coordinate descent) until convergence or max iterations.
+#' Adaptively tightens inner tolerances during outer loop for efficiency.
+#'
+#' @return List with elements:
+#' \itemize{
+#'   \item \code{Sinv}: Estimated precision matrix (inverse covariance).
+#'   \item \code{S}: Estimated covariance matrix.
+#'   \item \code{R}: Correlation matrix (unit diagonal).
+#'   \item \code{D}: Diagonal scaling vector.
+#'   \item \code{R_inv}: Inverse of R.
+#'   \item \code{n_iters}: Number of outer loop iterations.
+#'   \item \code{objective}: Objective value history.
+#'   \item \code{optimization_time}: Runtime of the optimization.
+#' }
+#'
+#' @seealso \code{\link{pcglassoPath}} for regularization path computation.
 #'
 #' @export
 #' @examples
+#' # Simulate hub network: variable 1 connected to all others
 #' p <- 7
-#' R.true <- toeplitz(c(c(1, -0.5), rep(0, p - 2)))
+#' n <- 40
+#' R.true <- diag(1, p, p)
+#' R.true[1, 2:p] <- 1/sqrt(p)
+#' R.true[2:p, 1] <- 1/sqrt(p)
 #' D.true <- sqrt(rchisq(p, 3))
 #' S_inv.true <- diag(D.true) %*% R.true %*% diag(D.true)
+#' Z <- MASS::mvrnorm(n, rep(0, p), solve(S_inv.true))
+#' S <- cov(Z)
 #'
-#' S <- solve(S_inv.true) # data
-#'
-#' alpha <- 4 / 20 # 4 / n, as in Carter's paper
-#' pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 3)
+#' # Fit PCGLASSO
+#' result <- pcglassoFast(S, lambda = 0.7, alpha = 0, verbose = 1)
 pcglassoFast <- function(
     S, lambda, alpha,
     R0 = .default_R0(S),
@@ -87,7 +107,7 @@ pcglassoFast <- function(
   stopifnot(
     !is.null(R0),
     is.numeric(lambda), lambda >= 0,
-    is.numeric(alpha),
+    is.numeric(alpha), alpha < 1,
     max_iter >= 1, tolerance > 0,
     is.matrix(R0), is.matrix(R0_inv),
     length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton),

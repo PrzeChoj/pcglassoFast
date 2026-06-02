@@ -2,7 +2,7 @@
 % Please edit documentation in R/path.R
 \name{pcglassoPath}
 \alias{pcglassoPath}
-\title{Pathwise blockwise optimization for pcglasso}
+\title{Regularization Path for Partial Correlation Graphical LASSO}
 \usage{
 pcglassoPath(
   S,
@@ -28,62 +28,113 @@ pcglassoPath(
 )
 }
 \arguments{
-\item{S}{(p × p matrix) empirical covariance matrix derived from the data.}
+\item{S}{(p x p matrix) Empirical covariance matrix.}
 
-\item{alpha}{(double, \eqn{\alpha \in \mathbb{R}}) on‑diagonal penalty parameter.}
+\item{alpha}{(double, \eqn{\alpha < 1}) Penalty on diagonal scaling (variance estimation).
+Must be strictly less than 1. Can be negative; typical value: \code{4/n} (n = sample size).}
 
-\item{lambdas}{(numeric vector) sequence of lambda values to fit. If \code{NULL}, an exponentially spaced grid of length \code{nlambda} from
-\eqn{\max_{i≠j}|S_{ij}|} down to \code{min_lambda_ratio * lambda_max} is generated.}
+\item{lambdas}{(numeric vector) Sequence of sparsity penalties to fit.
+If \code{NULL}, an exponentially spaced decreasing grid of length \code{nlambda} from
+\eqn{\lambda_{\max} = \max_{i \neq j} |S_{ij}|} down to
+\eqn{\lambda_{\min} = \text{min\_lambda\_ratio} \cdot \lambda_{\max}} is generated
+automatically.}
 
-\item{nlambda}{(integer) number of lambda values when \code{lambdas = NULL}.}
+\item{nlambda}{(integer) Number of lambda values when \code{lambdas = NULL}.
+Default: 50.}
 
-\item{min_lambda_ratio}{(double) ratio \eqn{\lambda_{\min}/\lambda_{\max}} used to build the grid.}
+\item{min_lambda_ratio}{(double in [0, 1]) Ratio \eqn{\lambda_{\min}/\lambda_{\max}}
+used to construct the exponential grid. Default: 0.01.}
 
-\item{max_edge_fraction}{(double in (0,1]) maximum allowed fraction of
-nonzero off‑diagonal entries ("edges") in the graph.  Once this is exceeded,
-the lambda‑path search stops early.}
+\item{max_edge_fraction}{(double in (0, 1]) Maximum allowed fraction of nonzero
+off-diagonal entries ("edges") relative to \eqn{p(p-1)}.
+Once exceeded, the path computation stops early. Default: 1.0 (no early stopping).
+Values < 1 are only meaningful when \code{lambdas} is decreasing (the default),
+where solutions progress from sparse to dense.}
 
-\item{R0, R0_inv}{(p × p matrices) initial precision matrix and its inverse; defaults to \code{diag(p)}.}
+\item{R0, R0_inv}{(p x p matrix) Initial correlation matrix and its inverse
+(unit diagonal). Leave at defaults unless providing a warm-start solution.}
 
-\item{D0}{(numeric vector of length p) initial diagonal entries; default is \code{rep(1,p)}.}
+\item{D0}{(numeric vector, length p) Initial diagonal scaling vector.
+Should be left at default unless providing a warm-start solution.}
 
-\item{max_iter, tolerance, tol_R, max_iter_R_outer, tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=pcglassoFast]{pcglassoFast()}} for each \code{lambda}.}
+\item{max_iter}{(integer) Maximum iterations of outer blockwise loop per \eqn{\lambda}.}
+
+\item{tolerance}{(double > 0) Outer loop convergence threshold per \eqn{\lambda}; stops when
+objective improvement in a single iteration < tolerance.}
+
+\item{solver_R}{(character) Optimization method for R-step: \code{"dual"} (Fortran,
+default) or \code{"primal"} (C++, alternative).}
+
+\item{tol_R, max_iter_R, max_iter_R_outer, tol_D, max_iter_D_newton, max_iter_D_ls, diagonal_Newton}{Tuning parameters passed to \code{\link{pcglassoFast}} for each \eqn{\lambda}.}
+
+\item{verbose}{(integer, 0--5) Logging detail. 0 = silent; 1 = termination reason;
+2 = objective; 3--4 = tolerance adaptation; 5 = detailed R-step diagnostics.}
 }
 \value{
-A list with components:
-\describe{
-\item{\code{lambdas}}{The grid of lambda values actually used.}
-\item{\code{R_path}}{List of estimated correlation matrices \eqn{R}.}
-\item{\code{D_path}}{List of estimated diagonal matrices \eqn{D}.}
-\item{\code{W_path}}{List of full covariance estimates \eqn{D\,R\,D}.}
-\item{\code{objective}}{Numeric vector of final objective values at each \eqn{\lambda}.}
+List with elements:
+\itemize{
+  \item \code{lambdas}: Numeric vector of \eqn{\lambda} values actually used
+    (may be shorter than input if early stopping occurs).
+  \item \code{R_path}: Named list of estimated correlation matrices (unit diagonal).
+  \item \code{Ri_path}: Named list of estimated inverse correlation matrices.
+  \item \code{D_path}: Named list of estimated diagonal scaling vectors.
+  \item \code{W_path}: Named list of covariance estimates \eqn{W = DRD}.
+  \item \code{Wi_path}: Named list of estimated precision matrices \eqn{W^{-1}}.
+  \item \code{objective}: Numeric vector of final objective values at each \eqn{\lambda}.
+  \item \code{iters}: Numeric vector of iterations needed for convergence per \eqn{\lambda}.
+  \item \code{path_optimization_time}: Total runtime of the entire path computation.
 }
 }
 \description{
-Pathwise blockwise optimization for pcglasso
+Compute the complete regularization path of PCGLASSO over a sequence of sparsity
+penalties. Leverages warm-starting from previous solutions to efficiently compute
+solutions across multiple \eqn{\lambda} values while decoupling correlation (R) and
+variance (D) estimation.
 }
 \details{
-This function computes the entire regularization path of the PC‑GLASSO estimator by calling
-\code{\link{pcglassoFast}()} at each value of \eqn{\lambda} in \code{lambdas}, warm‑starting
-from the previous solution.  You get back a list of \eqn{(R,D)} pairs (and the resulting
-covariance \eqn{W = D\,R\,D}) as \eqn{\lambda} decreases, stopping early if the
-graph density exceeds \code{max_edge_fraction}.
+\strong{Objective Function:}
+
+At each \eqn{\lambda}, maximizes \eqn{f(R, D) = \log(\det(R)) + (1 - \alpha) \log(\det(D^2)) - \text{tr}(DSDR) - \lambda ||R||_1}
+
+where \eqn{||R||_1} denotes the L1-norm of off-diagonal elements only.
+
+\strong{Warm-Starting Strategy:}
+
+The algorithm solves for decreasing values of \eqn{\lambda} in sequence.
+At each \eqn{\lambda_k}, the solution from \eqn{\lambda_{k-1}} is used as the starting point,
+ warm-start (R, D). This significantly reduces the computational cost compared to
+fitting each \eqn{\lambda} independently, especially when \eqn{\lambda} values are close.
+
+\strong{Early Stopping:}
+
+Path computation can terminate before reaching \code{lambdas[end]} if the number of
+unique edges (nonzero off-diagonal entries in the upper triangle) exceeds
+\code{max_edge_fraction * p * (p-1) / 2}.
+The returned path includes only the values actually computed.
+
+\strong{Lambda Grid Generation:}
+
+When \code{lambdas = NULL}, the grid is constructed as:
+\eqn{\lambda_k = \exp\left(\log(\lambda_{\max}) + \frac{k-1}{n_\lambda - 1} (\log(\lambda_{\min}) - \log(\lambda_{\max}))\right)}
+
+This exponential spacing is more appropriate for graphical lasso-type problems than linear spacing.
 }
 \examples{
+# Simulate hub network: variable 1 connected to all others
 p <- 7
-R.true <- toeplitz(c(1, -0.5, rep(0, p - 2)))
-D.true <- sqrt(rchisq(p, df = 3))
-S <- solve(diag(D.true) \%*\% R.true \%*\% diag(D.true))
-alpha <- 4 / 20
+n <- 40
+R.true <- diag(1, p, p)
+R.true[1, 2:p] <- 1/sqrt(p)
+R.true[2:p, 1] <- 1/sqrt(p)
+D.true <- sqrt(rchisq(p, 3))
+S_inv.true <- diag(D.true) \%*\% R.true \%*\% diag(D.true)
+Z <- MASS::mvrnorm(n, rep(0, p), solve(S_inv.true))
+S <- cov(Z)
 
-# get a small path of 20 lambdas but stop when >40\% edges
-resPath <- pcglassoPath(
-  S, alpha,
-  nlambda = 10,
-  verbose = 1
-)
-resPath
+# Fit PCGLASSO
+result <- pcglassoPath(S, alpha = 0, verbose = 1, nlambda = 6)
 }
 \seealso{
-\code{\link{pcglassoFast}} for a single‑lambda blockwise optimizer.
+\code{\link{pcglassoFast}} for a single-lambda optimization.
+\code{\link{evaluate_objective_path}} for post-hoc evaluation of solutions along the path.
 }

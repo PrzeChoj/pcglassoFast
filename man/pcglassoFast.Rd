@@ -2,7 +2,7 @@
 % Please edit documentation in R/pcglassoFast.R
 \name{pcglassoFast}
 \alias{pcglassoFast}
-\title{blockwise optimization for pcglasso}
+\title{Partial Correlation Graphical LASSO via Blockwise Coordinate Descent}
 \usage{
 pcglassoFast(
   S,
@@ -25,73 +25,95 @@ pcglassoFast(
 )
 }
 \arguments{
-\item{S}{(p x p matrix) empirical covariance matrix derived from the data.}
+\item{S}{(p x p matrix) Empirical covariance matrix.}
 
-\item{lambda, alpha}{(double \eqn{0\le\lambda}, double \eqn{\alpha \in \mathbb{R}})
-Parameters of the method. See Details section below.
-\itemize{
-\item \eqn{\lambda} is a penalty for off-diagonal
-\item \eqn{\alpha} is a penalty for on-diagonal
-}}
+\item{lambda}{(double >= 0) Sparsity penalty on off-diagonal elements of correlation matrix R.}
 
-\item{R0, R0_inv}{(p x p matrix, unit diagonal) initial estimation of
-precision matrix (it is recommended to left it default).}
+\item{alpha}{(double, \eqn{\alpha < 1}) Penalty on diagonal scaling (variance estimation).
+Must be strictly less than 1. Can be negative; typical value: \code{4/n} (n = sample size).}
 
-\item{D0}{(vector of length p) diagonal of initial estimation of diagonal
-matrix (it is recommended to left it default).}
+\item{R0, R0_inv}{(p x p matrix) Initial correlation matrix and its inverse
+(unit diagonal). Leave at defaults unless providing warm-start solution.}
 
-\item{max_iter}{(integer) maximum number of iterations.}
+\item{D0}{(numeric vector, length p) Initial diagonal scaling vector.
+Should be left at default unless providing a warm-start solution.}
 
-\item{tolerance}{(double) tolerance for convergence.}
+\item{max_iter}{(integer) Maximum iterations of outer blockwise loop.}
 
-\item{tol_R, max_iter_R_outer}{Parameters passed to \code{\link[=ROptimDual]{ROptimDual()}} function.}
+\item{tolerance}{(double > 0) Outer loop convergence threshold; stops when
+objective improvement in a single iteration < tolerance.}
 
-\item{tol_D, max_iter_D_newton, max_iter_D_ls}{Parameters passed to \code{\link[=DOptim]{DOptim()}} function.}
+\item{solver_R}{(character) Optimization method for R-step: \code{"dual"} (Fortran,
+default) or \code{"primal"} (C++, alternative).}
 
-\item{verbose}{(integer) print information about optimization process.
-\itemize{
-\item 0 -> no printing
-\item 1 -> information about why the optimization has ended
-\item 2 -> information about objective improvmenet
-\item 3 -> information about tolerance adaptation for D optimization
-\item 4 -> information about tolerance adaptation for R optimization
-\item 5 -> details about the R matrix optimization
-}}
+\item{tol_R}{(double > 0) Inner convergence tolerance for R-step optimization.}
+
+\item{max_iter_R}{(integer) Maximum iterations for inner R-step solver.}
+
+\item{max_iter_R_outer}{(integer) Maximum iterations for R-step dual solver.}
+
+\item{tol_D}{(double > 0) Inner convergence tolerance for D-step optimization.}
+
+\item{max_iter_D_newton}{(integer) Maximum Newton-Raphson steps in D optimization.}
+
+\item{max_iter_D_ls}{(integer) Maximum line search steps in D optimization.}
+
+\item{diagonal_Newton}{(logical) Use full Hessian (TRUE, default) or diagonal
+approximation (FALSE) in D-step Newton method.}
+
+\item{verbose}{(integer, 0--5) Logging detail. 0 = silent; 1 = termination reason;
+2 = objective; 3--4 = tolerance adaptation; 5 = detailed R-step diagnostics.}
 }
 \value{
-list of three elements:
+List with elements:
 \itemize{
-\item "R" - found correlation matrix
-\item "D" - found diagonal matrix
-\item "n_iters" - number of iterations of the outer loop
+  \item \code{Sinv}: Estimated precision matrix (inverse covariance).
+  \item \code{S}: Estimated covariance matrix.
+  \item \code{R}: Correlation matrix (unit diagonal).
+  \item \code{D}: Diagonal scaling vector.
+  \item \code{R_inv}: Inverse of R.
+  \item \code{n_iters}: Number of outer loop iterations.
+  \item \code{objective}: Objective value history.
+  \item \code{optimization_time}: Runtime of the optimization.
 }
 }
 \description{
-blockwise optimization for pcglasso
+Estimate sparse precision matrices by maximizing the PCGLASSO objective using
+blockwise coordinate descent. Decouples correlation (R) and variance (D) estimation
+with independent sparsity penalties.
 }
 \details{
-The function maximizes the
-\eqn{f(R, D) = log(det(R)) + (1-\alpha)log(det(D^2)) - tr(DSDR) - \lambda ||R||_1}
-function, where \eqn{||R||_1} is only for off-diagonal elements.
+\strong{Objective Function:}
 
-The function employs coordinate descent,
-also known as blockwise optimization,
-to iteratively optimize the variables \code{R} and \code{D}
-while fixing the other variable.
-It continues this process until convergence or
-until the maximum number of iterations is reached.
+Maximizes \eqn{f(R, D) = log(det(R)) + (1 - alpha) * log(det(D^2)) - trace(DSDR) - lambda ||R||_1}
+
+where \eqn{||R||_1} denotes the L1-norm of off-diagonal elements only, and
+W = DRD is the resulting covariance estimate.
+
+The objective is bi-concave: f(R, D_fixed) is concave in R, and f(R_fixed, D) is concave in D.
+This property justifies the blockwise coordinate descent algorithm.
+
+\strong{Blockwise coordinate descent algorithm:}
+
+Alternates between D-step (diagonal optimization via Newton-Raphson) and R-step
+(correlation optimization via coordinate descent) until convergence or max iterations.
+Adaptively tightens inner tolerances during outer loop for efficiency.
 }
 \examples{
+# Simulate hub network: variable 1 connected to all others
 p <- 7
-R.true <- toeplitz(c(c(1, -0.5), rep(0, p - 2)))
+n <- 40
+R.true <- diag(1, p, p)
+R.true[1, 2:p] <- 1/sqrt(p)
+R.true[2:p, 1] <- 1/sqrt(p)
 D.true <- sqrt(rchisq(p, 3))
 S_inv.true <- diag(D.true) \%*\% R.true \%*\% diag(D.true)
+Z <- MASS::mvrnorm(n, rep(0, p), solve(S_inv.true))
+S <- cov(Z)
 
-S <- solve(S_inv.true) # data
-
-alpha <- 4 / 20 # 4 / n, as in Carter's paper
-pcglassoFast(S, 0.12, alpha, max_iter = 15, diagonal_Newton = TRUE, verbose = 3)
+# Fit PCGLASSO
+result <- pcglassoFast(S, lambda = 0.7, alpha = 0, verbose = 1)
 }
 \seealso{
-\code{\link[=pcglassoPath]{pcglassoPath()}} to compute a full λ‑path of solutions
+\code{\link{pcglassoPath}} for regularization path computation.
 }
