@@ -235,7 +235,27 @@ compare_matrices <- function(Q, Q_est) {
 }
 
 .default_R0 <- function(S) {
+  # Compute initial correlation matrix from covariance S using eigenvalue
+  # regularization (truncation). This handles near-singular covariance matrices
+  # that can arise from dependent variables or small samples relative to p.
+
+  # When S is nearly singular, directly computing its inverse via solve(S + eps*I)
+  # can produce matrices with arbitrarily large entries, causing numerical
+  # instability in optimization. Instead, we use eigenvalue truncation: replace
+  # very small eigenvalues with a threshold (1e-4 * max eigenvalue) before
+  # inverting. This produces a regularized inverse with controlled magnitude.
+
   p <- nrow(S)
-  eps <- max(1e-8, 1e-8 * mean(diag(S), na.rm=TRUE))
-  cov2cor(solve(S + eps * diag(p)))
+  eig <- eigen(S, symmetric = TRUE)
+  evals <- eig$values
+  evecs <- eig$vectors
+
+  # Regularization: truncate small eigenvalues to prevent numerical explosion.
+  eps <- 1e-4 * max(evals)
+  evals_truncated <- pmax(evals, eps)
+
+  S_reg <- evecs %*% diag(evals_truncated) %*% t(evecs)
+
+  S_inv <- solve(S_reg)
+  cov2cor(S_inv)
 }

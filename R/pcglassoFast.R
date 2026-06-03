@@ -116,6 +116,33 @@ pcglassoFast <- function(
     all(is.finite(R0)), all(is.finite(R0_inv)),
     verbose %in% 0:5 # can be TRUE (1) or FALSE (0)
   )
+  p <- ncol(S)
+  eig_S <- eigen(S, symmetric = TRUE, only.values = TRUE)$values
+  min_eig <- eig_S[p]  # Smallest eigenvalue
+  max_eig <- eig_S[1]  # Largest eigenvalue
+
+  # Check for severely ill-conditioned or invalid covariance
+  threshold_eig <- -0.00001 * max_eig
+  if (min_eig < threshold_eig) {
+    stop(
+      "Input covariance matrix S has severely negative eigenvalue: ",
+      round(min_eig, 4), "\n",
+      "Largest eigenvalue: ", round(max_eig, 4), "\n",
+      "This suggests S is not a valid covariance matrix.\n",
+      "Possible causes:\n",
+      "  1. S is not symmetric or numerically symmetric (use (S + t(S))/2)\n",
+      "  2. S was computed from very small or highly dependent data\n",
+      "  3. S contains numerical errors or was improperly constructed\n",
+      "  4. Data matrix was not properly centered\n",
+      "Consider: (a) checking your input data, (b) using a different estimator,\n",
+      "         (c) or increasing sample size if n is small relative to p.",
+      call. = FALSE
+    )
+  }
+  # Small regularization for mild numerical issues (rare in practice)
+  if (min_eig < 0) {
+    S <- S + (-min_eig + 1e-10 * max_eig) * diag(p)
+  }
   D <- D0 * sqrt(diag(S))
   R <- R0
   R_inv <- R0_inv
