@@ -99,6 +99,7 @@ pcglassoFast <- function(
   D <- D0 * sqrt(diag(S))
   R <- R0
   R_inv <- R0_inv
+  R_dual_box <- NULL
   C <- cov2cor(S)
   strating_time <- Sys.time()
   digits_to_print <- max(0, -floor(log10(tolerance)))
@@ -162,7 +163,22 @@ pcglassoFast <- function(
       "primal" = R_step_primal,
       "primal_dual" = R_step_primalDual
     )
-    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
+    if (solver_R == "primal_dual") {
+      R_result <- R_step(
+        C, D, lambda, alpha, R, R_inv, tolerance, times_tol_R_decrease,
+        tol_R, tol_R_curr, max_iter_R, max_iter_R_outer,
+        objective_history[length(objective_history)], verbose,
+        length(objective_history) / 2,
+        R_dual_box_curr = R_dual_box
+      )
+    } else {
+      R_result <- R_step(
+        C, D, lambda, alpha, R, R_inv, tolerance, times_tol_R_decrease,
+        tol_R, tol_R_curr, max_iter_R, max_iter_R_outer,
+        objective_history[length(objective_history)], verbose,
+        length(objective_history) / 2
+      )
+    }
 
     R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
     if (!R_optimizaiton_improved_objective) {
@@ -176,6 +192,7 @@ pcglassoFast <- function(
     R <- R_result$R
     R_symetric <- R_result$R_symetric
     R_inv <- R_result$R_inv
+    R_dual_box <- if (solver_R == "primal_dual") R_result$dual_box else NULL
     improvement_R <- R_result$proposed_objective - objective_history[length(objective_history)]
     objective_history <- c(objective_history, R_result$proposed_objective)
 
@@ -338,25 +355,28 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
 }
 
 
-R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
+R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number, R_dual_box_curr = NULL) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
   p <- dim(C)[1]
 
   S_for_primal_dual <- C * (D %o% D)
+  max_iter_R_outer_curr <- min(max_iter_R_outer, max(2L, max_iter_R))
 
   resR <- ROptimPrimalDual(
     S = S_for_primal_dual,
     R = R_curr,
-    U = NULL,
+    U = R_dual_box_curr,
     lambda = lambda,
-    outer.Maxiter = max_iter_R_outer,
+    outer.Maxiter = max_iter_R_outer_curr,
     outer.tol = tol_R_curr,
     qp.Maxiter = max_iter_R,
     qp.tol = 1e-7,
-    obj.seq = FALSE
+    obj.seq = FALSE,
+    stopping.rule = "max",
+    track.qp.time = FALSE
   )
 
-  if (any(is.nan(resR$Rinv)) | any(is.nan(resR$R_symetric))) {
+  if ((!is.null(resR$Rinv) && any(is.nan(resR$Rinv))) | any(is.nan(resR$R_symetric))) {
     warn("NaNs introduced in primal-dual calculations")
     return()
   }
@@ -372,6 +392,7 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
     R = resR$R_symetric,
     R_symetric = resR$R_symetric,
     R_inv = resR$Rinv,
+    dual_box = resR$dual_box,
     proposed_objective = proposed_objective,
     iterations_done = iterations_done
   )

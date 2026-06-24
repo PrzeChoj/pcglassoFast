@@ -1,6 +1,5 @@
-# Note: box_qp_f is a Fortran routine that must be registered at package load
-# The wrapper function call_box_qp_f (in BoxQP.R) handles parameter type coercion
-# and calls the underlying Fortran routine via .Fortran()
+# The column sweep is implemented in primalDualSweepCpp(); the R wrapper keeps
+# validation, stopping rules, and optional objective tracing in one place.
 
 .dp_pcg_objective <- function(R, S, lambda) {
   chol_R <- chol(R)
@@ -12,7 +11,10 @@
 
 ROptimPrimalDual <-
   function(S, R = NULL, U = NULL, lambda, outer.Maxiter = 100, outer.tol = 10^-5,
-           qp.Maxiter = 1000, qp.tol = 10^-7, obj.seq = FALSE) {
+           qp.Maxiter = 1000, qp.tol = 10^-7, obj.seq = FALSE,
+           stopping.rule = c("hybrid", "max"),
+           track.qp.time = FALSE) {
+    stopping.rule <- match.arg(stopping.rule)
     if (is.null(S)) stop("S is required as input.", call. = FALSE)
     if (!is.matrix(S)) S <- as.matrix(S)
     if (!is.numeric(S)) stop("S should be numeric.", call. = FALSE)
@@ -59,74 +61,101 @@ ROptimPrimalDual <-
 
     if (p == 1) {
       obj.vals <- if (obj.seq) .dp_pcg_objective(R, S, lambda) else NULL
-      result <- list(R = R, U = U, rel.err = 0, sparse.nos = 0, time.counter.QP = c(0, 0, 0))
+      result <- list(
+        R = R, U = U, rel.err = 0, rms.err = 0, sparse.nos = 0,
+        time.counter.QP = c(user = 0, system = 0, elapsed = 0)
+      )
       if (obj.seq) result$obj.vals <- obj.vals
       return(result)
     }
 
-    rel.err <- rep(0, outer.Maxiter)
-    obj.vals <- rep(0, outer.Maxiter)
-    sparse.nos <- rep(0, outer.Maxiter)
-    time.counter.QP <- array(0, dim = c(outer.Maxiter * p, 3))
+    if (!obj.seq && stopping.rule == "max" && !track.qp.time) {
+      opt <- primalDualOuterCpp(
+        S = S,
+        R = R,
+        U = U,
+        lambda = lambda,
+        outerMaxIter = outer.Maxiter,
+        outerTol = outer.tol,
+        qpMaxIter = qp.Maxiter,
+        qpTol = qp.tol
+      )
 
-    ii <- 0
-    tol <- Inf
+      R <- opt$R
+      U <- opt$U
+      diag(R) <- 1
+      if (inherits(try(chol(R), silent = TRUE), "try-error")) {
+        stop("Final R is not positive definite.", call. = FALSE)
+      }
+
+      R_symetric <- (R + t(R)) / 2
+      diag(R_symetric) <- 1
+
+      return(list(
+        R = R,
+        R_symetric = R_symetric,
+        Rinv = NULL,
+        dual_box = U,
+        outer.count = opt$outer.count,
+        time.counter.QP = c(user = 0, system = 0, elapsed = 0),
+        rel.err = opt$rel.err,
+        rms.err = opt$rms.err,
+        sparse.nos = opt$sparse.nos
+      ))
+    }
+
+    max.err <- numeric(0)
+    rms.err <- numeric(0)
+    obj.vals <- numeric(0)
+    sparse.nos <- numeric(0)
+    time.counter.QP <- c(user = 0, system = 0, elapsed = 0)
+    off_diag <- row(R) != col(R)
+    current_obj <- if (obj.seq || stopping.rule == "hybrid") {
+      .dp_pcg_objective(R, S, lambda)
+    } else {
+      NA_real_
+    }
 
     for (outer.iter in seq_len(outer.Maxiter)) {
       R.old <- R
+      old_obj <- current_obj
 
-      for (j in seq_len(p)) {
-        ii <- ii + 1
-        I <- setdiff(seq_len(p), j)
-
-        A <- R[I, I, drop = FALSE]
-        s <- as.numeric(S[I, j])
-
-        U[I, j] <- pmin(lambda, pmax(-lambda, U[I, j]))
-
+      if (track.qp.time) {
         t <- proc.time()
-        obj <- call_box_qp_f(
-          Q = A,
-          u = as.numeric(U[I, j]),
-          b = s,
-          rho = lambda,
-          Maxiter = qp.Maxiter,
-          tol = qp.tol
-        )
-        t <- proc.time() - t
-        time.counter.QP[ii, ] <- as.numeric(c(t[1], t[2], t[3]))
-
-        u <- as.numeric(obj$u)
-        v <- s + u
-        g <- 0.5 * as.numeric(obj$grad_vec)
-
-        tval <- sum(v * g)
-        disc <- 1 + 4 * tval
-        if (disc <= 0) {
-          stop("PCGLASSO block update produced a non-positive discriminant.", call. = FALSE)
-        }
-        omega <- (1 + sqrt(disc)) / 2
-        r <- -g / omega
-
-        R[I, j] <- r
-        R[j, I] <- r
-        R[j, j] <- 1
-
-        U[I, j] <- u
-        U[j, I] <- u
-        U[j, j] <- 0
+        sweep <- primalDualSweepCpp(S, R, U, lambda, qp.Maxiter, qp.tol)
+        time.counter.QP <- time.counter.QP + as.numeric((proc.time() - t)[1:3])
+      } else {
+        sweep <- primalDualSweepCpp(S, R, U, lambda, qp.Maxiter, qp.tol)
       }
+      R <- sweep$R
+      U <- sweep$U
 
       diag(R) <- 1
-      tol <- max(abs(R - R.old)) / max(1, max(abs(R.old)))
-      rel.err[outer.iter] <- tol
-      sparse.nos[outer.iter] <- sum(abs(R[row(R) != col(R)]) <= 10^-9)
-      if (obj.seq) obj.vals[outer.iter] <- .dp_pcg_objective(R, S, lambda)
+      diff_R <- R - R.old
+      max_change <- max(abs(diff_R)) / max(1, max(abs(R.old)))
+      rms_change <- sqrt(mean(diff_R[off_diag]^2))
+      max.err[outer.iter] <- max_change
+      rms.err[outer.iter] <- rms_change
+      sparse.nos[outer.iter] <- sum(abs(R[off_diag]) <= 10^-9)
 
-      if (tol < outer.tol && outer.iter > 1) break
+      if (obj.seq || stopping.rule == "hybrid") {
+        current_obj <- .dp_pcg_objective(R, S, lambda)
+      }
+      if (obj.seq) obj.vals[outer.iter] <- current_obj
+
+      if (outer.iter > 1) {
+        converged <- max_change < outer.tol
+        if (stopping.rule == "hybrid") {
+          objective_change <- abs(current_obj - old_obj) / max(1, abs(old_obj))
+          objective_not_worse <- current_obj <= old_obj + max(outer.tol, 1e-12)
+          max_change_controlled <- max_change < 10 * outer.tol
+          converged <- converged ||
+            (rms_change < outer.tol && objective_change < outer.tol &&
+               objective_not_worse && max_change_controlled)
+        }
+        if (converged) break
+      }
     }
-
-    time.counter.QP <- colSums(time.counter.QP[seq_len(ii), , drop = FALSE])
 
     diag(R) <- 1
     if (inherits(try(chol(R), silent = TRUE), "try-error")) {
@@ -144,8 +173,9 @@ ROptimPrimalDual <-
       dual_box = U,
       outer.count = outer.iter,
       time.counter.QP = time.counter.QP,
-      rel.err = rel.err[seq_len(outer.iter)],
-      sparse.nos = sparse.nos[seq_len(outer.iter)]
+      rel.err = max.err,
+      rms.err = rms.err,
+      sparse.nos = sparse.nos
     )
     if (obj.seq) result$obj.vals <- obj.vals[seq_len(outer.iter)]
 

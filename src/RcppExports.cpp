@@ -28,6 +28,56 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// boxQpCpp
+Rcpp::List boxQpCpp(const arma::mat& Q, arma::vec u, const arma::vec& b, double rho, int maxIter, double tol);
+RcppExport SEXP _pcglassoFast_boxQpCpp(SEXP QSEXP, SEXP uSEXP, SEXP bSEXP, SEXP rhoSEXP, SEXP maxIterSEXP, SEXP tolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type Q(QSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type u(uSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type b(bSEXP);
+    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
+    Rcpp::traits::input_parameter< int >::type maxIter(maxIterSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    rcpp_result_gen = Rcpp::wrap(boxQpCpp(Q, u, b, rho, maxIter, tol));
+    return rcpp_result_gen;
+END_RCPP
+}
+// primalDualSweepCpp
+Rcpp::List primalDualSweepCpp(const arma::mat& S, arma::mat R, arma::mat U, double lambda, int qpMaxIter, double qpTol);
+RcppExport SEXP _pcglassoFast_primalDualSweepCpp(SEXP SSEXP, SEXP RSEXP, SEXP USEXP, SEXP lambdaSEXP, SEXP qpMaxIterSEXP, SEXP qpTolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type S(SSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type R(RSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type U(USEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< int >::type qpMaxIter(qpMaxIterSEXP);
+    Rcpp::traits::input_parameter< double >::type qpTol(qpTolSEXP);
+    rcpp_result_gen = Rcpp::wrap(primalDualSweepCpp(S, R, U, lambda, qpMaxIter, qpTol));
+    return rcpp_result_gen;
+END_RCPP
+}
+// primalDualOuterCpp
+Rcpp::List primalDualOuterCpp(const arma::mat& S, arma::mat R, arma::mat U, double lambda, int outerMaxIter, double outerTol, int qpMaxIter, double qpTol);
+RcppExport SEXP _pcglassoFast_primalDualOuterCpp(SEXP SSEXP, SEXP RSEXP, SEXP USEXP, SEXP lambdaSEXP, SEXP outerMaxIterSEXP, SEXP outerTolSEXP, SEXP qpMaxIterSEXP, SEXP qpTolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type S(SSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type R(RSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type U(USEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< int >::type outerMaxIter(outerMaxIterSEXP);
+    Rcpp::traits::input_parameter< double >::type outerTol(outerTolSEXP);
+    Rcpp::traits::input_parameter< int >::type qpMaxIter(qpMaxIterSEXP);
+    Rcpp::traits::input_parameter< double >::type qpTol(qpTolSEXP);
+    rcpp_result_gen = Rcpp::wrap(primalDualOuterCpp(S, R, U, lambda, outerMaxIter, outerTol, qpMaxIter, qpTol));
+    return rcpp_result_gen;
+END_RCPP
+}
 // updateBeta
 void updateBeta(arma::vec& beta, const arma::mat& Qinv_ii, arma::vec& Qinv_beta, const arma::vec& s, double lambda, int p);
 RcppExport SEXP _pcglassoFast_updateBeta(SEXP betaSEXP, SEXP Qinv_iiSEXP, SEXP Qinv_betaSEXP, SEXP sSEXP, SEXP lambdaSEXP, SEXP pSEXP) {
