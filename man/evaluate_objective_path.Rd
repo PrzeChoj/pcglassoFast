@@ -2,28 +2,91 @@
 % Please edit documentation in R/path.R
 \name{evaluate_objective_path}
 \alias{evaluate_objective_path}
-\title{Objective function evaluation}
+\title{Evaluate solutions along a regularization path}
 \usage{
 evaluate_objective_path(precision_array, Sigma, n, gamma = 0.5)
 }
 \arguments{
-\item{precision_array}{(p x p x k)}
+\item{precision_array}{Either:
+- A p x p x k numeric array of precision matrices (one per slice),
+- or a list from \code{\link{pcglassoPath}} containing element \code{W_path}.}
 
-\item{Sigma}{(p x p) the covariance matrix}
+\item{Sigma}{(p x p numeric matrix) Empirical covariance matrix (same one used in fitting).}
 
-\item{n}{(int)   number of observations}
+\item{n}{(positive integer) Sample size used in fitting. Used for log-likelihood and
+BIC computation.}
 
-\item{gamma}{(1 x 1) scaling parameter for \eqn{BIC_{gamma}}}
+\item{gamma}{(double in [0, 1]) Scaling parameter for the BIC_gamma penalty on model complexity.
+Default: 0.5. Larger values (e.g., 1.0) more heavily penalize additional parameters;
+smaller values (e.g., 0) reduce the complexity penalty. See Details below.}
 }
 \value{
-list (k x 1) $loglik the average loglikelihood
-                     $forbenious
-                     $n_param
-                     $BIC_gamma the average BIC_gamma
+List with elements:
+\itemize{
+  \item \code{loglik}: Numeric vector of log-likelihood values (one per solution).
+  \item \code{forbenious}: Numeric vector of Frobenius norms (covariance reconstruction error).
+  \item \code{n_param}: Numeric vector of parameter counts.
+  \item \code{BIC_gamma}: Numeric vector of BIC_gamma values (for model selection).
+  \item \code{nEdges}: Numeric vector of edge counts (number of nonzero off-diagonal entries).
+}
 }
 \description{
-computes the objective for the solution of the pcglassoPath, or a list or an array of
-matrices
-the BIC_gamma is from Extended Bayesian Information Criteria for Gaussian
-Graphical Models
+Computes model selection and diagnostics metrics (log-likelihood, reconstruction error,
+BIC_gamma, number of edges) across a sequence of regularization solutions.
+
+This function aids in choosing an optimal regularization parameter (lambda
+in PCGLASSO) by evaluating objective functions at each solution along the path.
+
+Input formats: The function accepts either (1) a 3D array of p x p x k precision matrices,
+or (2) a list output from \code{\link{pcglassoPath}}.
+}
+\details{
+\strong{Mathematical Formulas:}
+
+For each solution (indexed k), let \eqn{P_k} be the precision matrix, Sigma the
+empirical covariance, and p the dimension.
+
+\strong{Log-likelihood} (Gaussian assumption):
+\deqn{loglik_k = n * (log(det(P_k)) - (1/2)*tr(P_k * Sigma) - (p/2)*log(2*pi))}
+
+\strong{Frobenius norm} (reconstruction error):
+\deqn{Frobenius_k = sum((cov_k - Sigma)^2) = sum((solve(P_k) - Sigma)^2)}
+
+\strong{BIC_gamma} (Extended Bayesian Information Criterion, cf. Bogdan et al.):
+\deqn{BIC\_gamma_k = -2 * loglik_k + nEdges_k * (log(n) + 4 * gamma * log(p))}
+where \eqn{nEdges_k} is the count of nonzero off-diagonal entries in \eqn{P_k}:
+\deqn{nEdges_k = (1/2) * (nonzeros(P_k) - p)}
+(counts unique edges, excluding the diagonal).
+
+\strong{Number of parameters:}
+\deqn{n\_param_k = nEdges_k + p}
+(non-zero off-diagonal entries plus diagonal entries).
+}
+\examples{
+p <- 7
+n <- 40
+R.true <- diag(1, p, p)
+R.true[1, 2:p] <- -1/sqrt(p)
+R.true[2:p, 1] <- -1/sqrt(p)
+D.true <- sqrt(rchisq(p, 3))
+S_inv.true <- diag(D.true) \%*\% R.true \%*\% diag(D.true)
+Z <- MASS::mvrnorm(n, rep(0, p), solve(S_inv.true))
+S <- cov(Z)
+
+result <- pcglassoPath(S, alpha = 0, nlambda = 5)
+
+# Example 1: Evaluate using list output from pcglassoPath
+evals <- evaluate_objective_path(result, Sigma = S, n = n)
+best_idx <- which.min(evals$BIC_gamma)
+cat("Best lambda by BIC:", result$lambdas[best_idx], "\n")
+
+# Example 2: Evaluate using 3D array directly
+W_array <- simplify2array(result$W_path)
+evals2 <- evaluate_objective_path(W_array, Sigma = S, n = n)
+identical(evals, evals2) # TRUE
+}
+\seealso{
+\code{\link{pcglassoPath}} for computing the regularization path.
+\code{\link{compare_matrices}} for element-wise comparison with a true precision matrix.
+\code{\link{pcglassoFast}} for single-lambda fitting.
 }

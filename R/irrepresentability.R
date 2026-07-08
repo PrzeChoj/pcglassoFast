@@ -1,33 +1,69 @@
-#' Compute irrepresentability for GLASSO and PCGLASSO
+#' Compute irrepresentability condition for GLASSO and PCGLASSO
 #'
-#' When the irrepresentability condition holds, then
-#'  for infinite data (\eqn{n = \infty}) there exists a lambda
-#'  that the PCGLASSO (or GLASSO) estimator can recover the true
-#'  underlying structure of the precision matrix.
+#' Assesses whether the irrepresentability condition (a theoretical requirement for
+#' asymptotic recovery guarantees) holds for a given precision matrix.
 #'
-#' @param K True precition matrix
+#' When the irrepresentability condition holds (result < 1), there exists a sequence
+#' of regularization parameters lambda_n that decreases to zero with sample size n,
+#' such that for this sequence, the probability that the PCGLASSO (or GLASSO) estimator
+#' recovers the sparsity pattern (zero/nonzero structure) of the true precision
+#' matrix converges to 1 as n approaches infinity.
 #'
-#' @returns A non-negative number.
-#'  When smaller than 1, it means the irrepresentability condition holds.
-#'  When bigger than 1, it means the irrepresentability condition is violated.
+#' @description
+#' Key difference: PCGLASSO's irrepresentability condition depends only on the
+#' correlation structure (matrix R), NOT on the variance scales (matrix D).
+#' This is a theoretical advantage over GLASSO, which depends on all entries of K.
+#' See examples below for a concrete demonstration.
+#'
+#' @param K True precision matrix (p x p, symmetric, positive definite).
+#'
+#' @returns A non-negative scalar:
+#'   \item{}{< 1: Irrepresentability condition holds. Recovery guarantees apply (asymptotically).}
+#'   \item{}{>= 1: Irrepresentability condition violated. No recovery guarantees (but methods may
+#'     still work in practice).}
+#'
+#' @details
+#' \strong{PCGLASSO vs. GLASSO comparison:}
+#'
+#' For a given correlation structure R (unit diagonal) with variance scales D:
+#'
+#' - PCGLASSO: irrepresentability condition depends only on R. Changing D
+#'   does not change the result. This makes PCGLASSO more robust to heterogeneous variances.
+#'
+#' - GLASSO: irrepresentability condition depends on the full precision matrix
+#'   K = DRD. Changing D changes the result, sometimes significantly.
+#'
+#' See the examples for a concrete demonstration.
+#'
+#' @seealso
+#' \code{\link{pcglassoFast}}, \code{\link{pcglassoPath}} for PCGLASSO estimation.
+#' \code{\link{compare_matrices}} for empirical evaluation of estimated vs. true matrices.
 #'
 #' @export
 #'
 #' @importFrom pracma kron
 #'
 #' @examples
-#' set.seed(123)
 #' p <- 7
-#' R.true <- toeplitz(c(1, -0.2, 0, 0, 0, 0, 0))
+#' R.true <- diag(1, p, p)
+#' R.true[1, 2:p] <- -1/sqrt(p)
+#' R.true[2:p, 1] <- -1/sqrt(p)
+#'
+#' # Scenario 1: Homogeneous variances
+#' D.true <- rep(1, p)
+#' Q.true <- diag(D.true) %*% R.true %*% diag(D.true)
+#' irr_pc1 <- irrepPCGLASSO(Q.true)
+#' cat("PCGLASSO irrepresentability (homogeneous D):", round(irr_pc1, 4), "\n")
+#' # Result: irr_pc1 < 1 (condition holds)
+#'
+#' # Scenario 2: Heterogeneous variances
+#' set.seed(456)
 #' D.true <- sqrt(rchisq(p, 3))
 #' Q.true <- diag(D.true) %*% R.true %*% diag(D.true)
+#' irr_pc2 <- irrepPCGLASSO(Q.true)
+#' cat("PCGLASSO irrepresentability (heterogeneous D):", round(irr_pc2, 4), "\n")
+#' # Result: irr_pc2 == irr_pc1 (VARIANCE-INVARIANT!)
 #'
-#' irrepPCGLASSO(Q.true) # `0.3999698`
-#'
-#' D.true <- sqrt(rchisq(p, 30))
-#' Q.true <- diag(D.true) %*% R.true %*% diag(D.true)
-#'
-#' irrepPCGLASSO(Q.true) # `0.3999698`, the same
 irrepPCGLASSO <- function(K) {
   p <- ncol(K)
   D <- diag(sqrt(diag(K)))
@@ -58,22 +94,23 @@ irrepPCGLASSO <- function(K) {
 }
 
 #' @rdname irrepPCGLASSO
-#'
 #' @export
 #'
 #' @examples
-#' set.seed(123)
-#' p <- 7
-#' R.true <- toeplitz(c(1, -0.2, 0, 0, 0, 0, 0))
+#' # Scenario 1 GLASSO: Homogeneous variances
+#' D.true <- rep(1, p)
+#' Q.true <- diag(D.true) %*% R.true %*% diag(D.true)
+#' irr_gl1 <- irrepGLASSO(Q.true)
+#' cat("GLASSO irrepresentability (homogeneous D):", round(irr_gl1, 4), "\n")
+#'
+#' # Scenario 2 GLASSO: Heterogeneous variances (same D as in irrepPCGLASSO)
+#' set.seed(456)
 #' D.true <- sqrt(rchisq(p, 3))
 #' Q.true <- diag(D.true) %*% R.true %*% diag(D.true)
-#'
-#' irrepGLASSO(Q.true) # `2.588011`
-#'
-#' D.true <- sqrt(rchisq(p, 30))
-#' Q.true <- diag(D.true) %*% R.true %*% diag(D.true)
-#'
-#' irrepGLASSO(Q.true) # `0.5570903`, different; depends on `D.true`
+#' irr_gl2 <- irrepGLASSO(Q.true)
+#' cat("GLASSO irrepresentability (heterogeneous D):", round(irr_gl2, 4), "\n")
+#' # Key difference: irr_gl2 != irr_gl1 (VARIANCE-DEPENDENT!)
+#' # GLASSO is sensitive to variance scales.
 irrepGLASSO <- function(K){
   non_zero_indices <- which( abs(K) >  0.00000001 )
   zero_indices     <- which( abs(K) <= 0.00000001 )

@@ -7,24 +7,36 @@
 cov2cor_inv(C, diagSigma)
 }
 \arguments{
-\item{C}{A numeric correlation matrix (p×p) or an array of shape p×p×k.
-Each slice C[,,i] must be a valid correlation matrix (1's on the diagonal).}
+\item{C}{A numeric correlation matrix (p x p) or an array of shape p x p x k.
+Each slice C[,,i] must be a valid correlation matrix (1 on the diagonal).}
 
-\item{diagSigma}{Either
-- a numeric vector of length p (variances for each variable),
-- or a numeric matrix p×k (variances for each slice).
-If \code{C} is 2D, only the length-p option is used.}
+\item{diagSigma}{Either:
+- a numeric vector of length p (variances for each variable; applied to all k slices if C is 3D),
+- or a numeric matrix p x k (slice-specific variances; must match dimensions of C).
+If \code{C} is 2D, only the length-p vector form is used.}
 }
 \value{
-If \code{C} is 2D, a p×p covariance matrix
-  \eqn{\Sigma = D\,C\,D}, where \eqn{D = \mathrm{diag}(\sqrt{\mathrm{diagSigma}})}.
-  If \code{C} is 3D (p×p×k), returns a p×p×k array of \eqn{\Sigma^{(i)}}.
+If \code{C} is 2D, a p x p covariance matrix
+  \eqn{Sigma = D C D}, where \eqn{D = diag(sqrt(diagSigma))}.
+  If \code{C} is 3D (p x p x k), returns a p x p x k array of covariance matrices.
 }
 \description{
 Reconstruct covariance(s) from correlation(s) plus variances.
 }
+\details{
+This function inverts the transformation performed by \code{\link[stats]{cov2cor}}.
+Given a correlation matrix C (with unit diagonal) and a vector (or matrix) of
+variances, it reconstructs the corresponding covariance matrix via the transformation
+\eqn{Sigma = D C D}, where \eqn{D = diag(sqrt(variances))}.
+
+
+The transformation formula is:
+\deqn{Sigma = D C D}
+where \eqn{D = diag(sqrt(v_1), ..., sqrt(v_p))} is the diagonal matrix of
+standard deviations derived from variances.
+}
 \examples{
-# 2D example
+# 2D example: recover covariance from correlation + variances
 Sigma <- matrix(c(4, 1.2, 1.2, 9), 2, 2)
 C <- cov2cor(Sigma)
 Sigma2 <- cov2cor_inv(C, diag(Sigma))
@@ -35,11 +47,13 @@ C3 <- array(0, c(2, 2, 2))
 C3[, , 1] <- diag(2)
 C3[, , 2] <- cov2cor(Sigma)
 S3 <- cov2cor_inv(C3, diag(Sigma))
-dim(S3) # 2 2 2
 
-# 3D with slice‐specific variances
-vars <- cbind(c(4, 9), c(1, 16)) # 2×2: first slice variances (4,9), second (1,16)
+# 3D with slice-specific variances
+vars <- cbind(c(4, 9), c(1, 16)) # 2x2: first slice vars (4,9), second (1,16)
 S4 <- cov2cor_inv(C3, vars)
-all(dim(S4) == c(2, 2, 2))
 
+}
+\seealso{
+\code{\link[stats]{cov2cor}} for the forward transformation.
+\code{\link{pcglassoFast}} for the PCGLASSO solver (output includes \code{R} and \code{D}).
 }
