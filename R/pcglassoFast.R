@@ -82,7 +82,7 @@ pcglassoFast <- function(
     max_iter = 1000, tolerance = 1e-3,
     solver_R = c("dual", "primal", "primal_dual"),
     tol_R = 1e-8,
-    max_iter_R = 100, max_iter_R_outer = 500000,
+    max_iter_R = 10, max_iter_R_outer = 10000,
     tol_D = 1e-8,
     max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
@@ -407,7 +407,7 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
   p <- dim(C)[1]
 
   S_for_primal_dual <- C * (D %o% D)
-  max_iter_R_outer_curr <- min(max_iter_R_outer, max(2L, max_iter_R))
+  max_iter_R_outer_curr <- 100
 
   iterations_in_R_done <- -1
   iterations_in_dual_done <- 0
