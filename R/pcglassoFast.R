@@ -294,10 +294,8 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
   max_iter_R_outer_curr <- 100
 
   S_for_dual <- C * (D %o% D)
-  iterations_in_R_done <- -1
   iterations_in_dual_done <- 0
   repeat {
-    iterations_in_R_done <- iterations_in_R_done + 1
     if (verbose >= 5) {
       print("=== R step ===")
       print(paste0("tol_R_curr = ", tol_R_curr))
@@ -357,10 +355,10 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
         }))
     }
 
-    if (iterations_in_R_done >= max_iter_R) {
-      # no improvement can be made
+    if (iterations_in_dual_done >= max_iter_R_outer) {
+      # reached the maximum number of dual iterations for the R optimization
       if (verbose >= 2) {
-        print("TODO: end R optim")
+        print("Ending dual R optimization at max_iter_R_outer")
       }
       if (!R_positive_definite) {
         # fix R to be positive definite
@@ -375,7 +373,7 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
       break
     }
 
-    if (resR$outer.count < max_iter_R_outer) {
+    if (resR$outer.count < max_iter_R_outer_curr) {
       new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
       if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)){
         print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
@@ -409,12 +407,9 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
   S_for_primal_dual <- C * (D %o% D)
   max_iter_R_outer_curr <- 100
 
-  iterations_in_R_done <- -1
   iterations_in_dual_done <- 0
 
   repeat {
-    iterations_in_R_done <- iterations_in_R_done + 1
-
     if (verbose >= 5) {
       print("=== R step (Primal-Dual) ===")
       print(paste0("tol_R_curr = ", tol_R_curr))
@@ -478,9 +473,9 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
     }
 
     # Check iteration limit
-    if (iterations_in_R_done >= max_iter_R) {
+    if (iterations_in_dual_done >= max_iter_R_outer) {
       if (verbose >= 2) {
-        print("Ending primal-dual R optimization at max_iter_R")
+        print("Ending primal-dual R optimization at max_iter_R_outer")
       }
 
       if (!R_positive_definite) {
