@@ -362,30 +362,111 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
   S_for_primal_dual <- C * (D %o% D)
   max_iter_R_outer_curr <- min(max_iter_R_outer, max(2L, max_iter_R))
 
-  resR <- ROptimPrimalDual(
-    S = S_for_primal_dual,
-    R = R_curr,
-    U = R_dual_box_curr,
-    lambda = lambda,
-    outer.Maxiter = max_iter_R_outer_curr,
-    outer.tol = tol_R_curr,
-    qp.Maxiter = max_iter_R,
-    qp.tol = 1e-7,
-    obj.seq = FALSE,
-    stopping.rule = "max",
-    track.qp.time = FALSE
-  )
+  iterations_in_R_done <- -1
+  iterations_in_dual_done <- 0
 
-  if ((!is.null(resR$Rinv) && any(is.nan(resR$Rinv))) | any(is.nan(resR$R_symetric))) {
-    warn("NaNs introduced in primal-dual calculations")
-    return()
-  }
+  repeat {
+    iterations_in_R_done <- iterations_in_R_done + 1
 
-  proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
-  iterations_done <- resR$outer.count
+    if (verbose >= 5) {
+      print("=== R step (Primal-Dual) ===")
+      print(paste0("tol_R_curr = ", tol_R_curr))
+      print(paste0("outer.Maxiter = ", max_iter_R_outer_curr))
+    }
 
-  if (verbose >= 2) {
-    print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_done, " iters of R optim"))
+    resR <- ROptimPrimalDual(
+      S = S_for_primal_dual,
+      R = R_curr,
+      U = R_dual_box_curr,
+      lambda = lambda,
+      outer.Maxiter = max_iter_R_outer_curr,
+      outer.tol = tol_R_curr,
+      qp.Maxiter = max_iter_R,
+      qp.tol = 1e-7,
+      obj.seq = FALSE,
+      stopping.rule = "max",
+      track.qp.time = FALSE
+    )
+
+    if ((!is.null(resR$Rinv) && any(is.nan(resR$Rinv))) | any(is.nan(resR$R_symetric))) {
+      warn("NaNs introduced in primal-dual calculations")
+      return()
+    }
+
+    proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+    iterations_in_dual_done <- iterations_in_dual_done + resR$outer.count
+
+    if (verbose >= 5) {
+      print("=== After R step (Primal-Dual) ===")
+      print(paste0("objective: ", round(proposed_objective, digits_to_print)))
+    }
+
+    # Check if objective improved
+    objective_is_better <- (proposed_objective > prev_objective - tolerance_full_optimization * 0.1)
+
+    # Check if R is positive definite
+    smallest_eigen_value <- eigen(resR$R_symetric, TRUE, TRUE)$values[p]
+    R_positive_definite <- (smallest_eigen_value > 0)
+
+    if (objective_is_better & R_positive_definite) {
+      # Success: objective improved and R is valid
+      if (verbose >= 2) {
+        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_in_dual_done, " iters of R optim"))
+      }
+      break  # ← EXIT repeat loop
+    }
+
+    # Diagnose why continuing
+    if (verbose >= 4) {
+      print(paste0(
+        "Continue R optimization as ",
+        if (!objective_is_better) {
+          paste0("objective has not yet improved (objective = ",
+                 round(proposed_objective, digits_to_print),
+                 " prev objective = ", round(prev_objective, digits_to_print), ")")
+        } else {
+          paste0("R matrix was not positive definite (eigen value ",
+                 round(smallest_eigen_value, digits_to_print), ")")
+        }))
+    }
+
+    # Check iteration limit
+    if (iterations_in_R_done >= max_iter_R) {
+      if (verbose >= 2) {
+        print("Ending primal-dual R optimization at max_iter_R")
+      }
+
+      if (!R_positive_definite) {
+        # Force R to be positive definite
+        warn(paste0("Primal-dual R optimization resulted in non-positive definite matrix"))
+        desired_smallest_eigen_value <- 0.01
+        x <- (1 - desired_smallest_eigen_value) / (1 - smallest_eigen_value)
+        resR$R_symetric <- x * resR$R_symetric + diag(1 - x, p)
+        proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+      }
+      break  # EXIT repeat loop
+    }
+
+    # Adapt tolerance strategy
+    if (resR$outer.count < max_iter_R_outer_curr) {
+      # Primal-dual solver had room to spare -> tighten tolerance
+      new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
+      if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)) {
+        print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
+      }
+      tol_R_curr <- new_tol_R_curr
+    } else {
+      # Primal-dual solver hit its limit -> increase budget
+      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer)
+      if ((verbose >= 4) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)) {
+        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
+      }
+      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
+    }
+
+    # Update state & retry
+    R_curr <- resR$R_symetric
+    R_dual_box_curr <- resR$dual_box
   }
 
   list(
@@ -394,7 +475,7 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
     R_inv = resR$Rinv,
     dual_box = resR$dual_box,
     proposed_objective = proposed_objective,
-    iterations_done = iterations_done
+    iterations_done = iterations_in_dual_done
   )
 }
 
