@@ -82,7 +82,7 @@ pcglassoFast <- function(
     max_iter = 1000, tolerance = 1e-3,
     solver_R = c("dual", "primal", "primal_dual"),
     tol_R = 1e-8,
-    max_iter_R = 10, max_iter_R_outer = 10000,
+    max_iter_R = 20, max_iter_R_outer = 5000,
     tol_D = 1e-8,
     max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
@@ -380,7 +380,9 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
       }
       tol_R_curr <- new_tol_R_curr
     } else {
-      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer)
+      # cap growth so a single call cannot exceed the total budget:
+      # iterations_in_dual_done + max_iter_R_outer_curr <= max_iter_R_outer
+      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer - iterations_in_dual_done)
       if ((verbose >= 4) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)){
         print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
       }
@@ -499,7 +501,9 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
       tol_R_curr <- new_tol_R_curr
     } else {
       # Primal-dual solver hit its limit -> increase budget
-      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer)
+      # cap growth so a single call cannot exceed the total budget:
+      # iterations_in_dual_done + max_iter_R_outer_curr <= max_iter_R_outer
+      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer - iterations_in_dual_done)
       if ((verbose >= 4) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)) {
         print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
       }
