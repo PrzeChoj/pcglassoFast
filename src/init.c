@@ -7,6 +7,9 @@
 extern SEXP _pcglassoFast_Qinv_down_cpp(void *, void *);
 extern SEXP _pcglassoFast_Qinv_down_subet(void *, void *, void *);
 extern SEXP _pcglassoFast_Qinv_up_cpp(void *, void *, void *, void *);
+extern SEXP _pcglassoFast_boxQpCpp(void *, void *, void *, void *, void *, void *);
+extern SEXP _pcglassoFast_primalDualOuterCpp(void *, void *, void *, void *, void *, void *, void *, void *);
+extern SEXP _pcglassoFast_primalDualSweepCpp(void *, void *, void *, void *, void *, void *);
 extern SEXP _pcglassoFast_updateBeta(void *, void *, void *, void *, void *, void *);
 extern SEXP _pcglassoFast_updateLoopCpp(void *, void *, void *, void *, void *, void *, void *);
 
@@ -18,6 +21,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_pcglassoFast_Qinv_down_cpp",   (DL_FUNC) &_pcglassoFast_Qinv_down_cpp,   2},
     {"_pcglassoFast_Qinv_down_subet", (DL_FUNC) &_pcglassoFast_Qinv_down_subet, 3},
     {"_pcglassoFast_Qinv_up_cpp",     (DL_FUNC) &_pcglassoFast_Qinv_up_cpp,     4},
+    {"_pcglassoFast_boxQpCpp",        (DL_FUNC) &_pcglassoFast_boxQpCpp,        6},
+    {"_pcglassoFast_primalDualOuterCpp", (DL_FUNC) &_pcglassoFast_primalDualOuterCpp, 8},
+    {"_pcglassoFast_primalDualSweepCpp", (DL_FUNC) &_pcglassoFast_primalDualSweepCpp, 6},
     {"_pcglassoFast_updateBeta",      (DL_FUNC) &_pcglassoFast_updateBeta,      6},
     {"_pcglassoFast_updateLoopCpp",   (DL_FUNC) &_pcglassoFast_updateLoopCpp,   7},
     {NULL, NULL, 0}
