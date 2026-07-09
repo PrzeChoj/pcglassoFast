@@ -362,13 +362,17 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
       }
       if (!R_positive_definite) {
         # fix R to be positive definite
-        warn(paste0("R optimization resulted in non-positive definite matrix"))
+        warning("R optimization resulted in non-positive definite matrix")
         desired_smallest_eigen_value <- 0.01
-        x <- (1-desired_smallest_eigen_value) / (1-smallest_eigen_value)
-        resR$R_symetric <- x*resR$R_symetric + diag(1-x, p)
+        x <- (1 - desired_smallest_eigen_value) / (1 - smallest_eigen_value)
+
+        resR$R_symetric <- x * resR$R_symetric + diag(1 - x, p)
+        resR$R <- resR$R_symetric
         resR$Rinv <- solve(resR$R_symetric)
 
-        proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+        proposed_objective <- function_to_optimize(
+          resR$R_symetric, D, C, lambda, alpha
+        )
       }
       break
     }
@@ -481,12 +485,18 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
       }
 
       if (!R_positive_definite) {
-        # Force R to be positive definite
-        warn(paste0("Primal-dual R optimization resulted in non-positive definite matrix"))
+        # fix R to be positive definite
+        warning("R optimization resulted in non-positive definite matrix")
         desired_smallest_eigen_value <- 0.01
         x <- (1 - desired_smallest_eigen_value) / (1 - smallest_eigen_value)
+
         resR$R_symetric <- x * resR$R_symetric + diag(1 - x, p)
-        proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+        resR$R <- resR$R_symetric
+        resR$Rinv <- NA
+
+        proposed_objective <- function_to_optimize(
+          resR$R_symetric, D, C, lambda, alpha
+        )
       }
       break  # EXIT repeat loop
     }
