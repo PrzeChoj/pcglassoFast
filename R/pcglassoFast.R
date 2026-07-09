@@ -373,21 +373,15 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
       break
     }
 
-    if (resR$outer.count < max_iter_R_outer_curr) {
-      new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
-      if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)){
-        print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
-      }
-      tol_R_curr <- new_tol_R_curr
-    } else {
-      # cap growth so a single call cannot exceed the total budget:
-      # iterations_in_dual_done + max_iter_R_outer_curr <= max_iter_R_outer
-      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer - iterations_in_dual_done)
-      if ((verbose >= 4) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)){
-        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
-      }
-      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
+    # decrease `tol_R_curr` every time.
+    # This is better becouse the inner solver uses `tol_R_curr`
+    # to set `thrLasso` which may be the problem here.
+    new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
+    if ((verbose >= 1) & (new_tol_R_curr < tol_R_curr)){
+      print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
     }
+    tol_R_curr <- new_tol_R_curr
+
     R_curr <- resR$R
     R_inv_curr <- resR$Rinv
   }
@@ -491,24 +485,12 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
       break  # EXIT repeat loop
     }
 
-    # Adapt tolerance strategy
-    if (resR$outer.count < max_iter_R_outer_curr) {
-      # Primal-dual solver had room to spare -> tighten tolerance
-      new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
-      if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)) {
-        print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
-      }
-      tol_R_curr <- new_tol_R_curr
-    } else {
-      # Primal-dual solver hit its limit -> increase budget
-      # cap growth so a single call cannot exceed the total budget:
-      # iterations_in_dual_done + max_iter_R_outer_curr <= max_iter_R_outer
-      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer - iterations_in_dual_done)
-      if ((verbose >= 4) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)) {
-        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
-      }
-      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
+    # tighten tolerance
+    new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
+    if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)) {
+      print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
     }
+    tol_R_curr <- new_tol_R_curr
 
     # Update state & retry
     R_curr <- resR$R_symetric
