@@ -383,15 +383,8 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
         print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
       }
       tol_R_curr <- new_tol_R_curr
-    } else {
-      # cap growth so a single call cannot exceed the total budget:
-      # iterations_in_dual_done + max_iter_R_outer_curr <= max_iter_R_outer
-      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer - iterations_in_dual_done)
-      if ((verbose >= 4) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)){
-        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
-      }
-      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
     }
+
     R_curr <- resR$R
     R_inv_curr <- resR$Rinv
   }
@@ -509,15 +502,6 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
         print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
       }
       tol_R_curr <- new_tol_R_curr
-    } else {
-      # Primal-dual solver hit its limit -> increase budget
-      # cap growth so a single call cannot exceed the total budget:
-      # iterations_in_dual_done + max_iter_R_outer_curr <= max_iter_R_outer
-      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer - iterations_in_dual_done)
-      if ((verbose >= 4) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)) {
-        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
-      }
-      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
     }
 
     # Update state & retry
