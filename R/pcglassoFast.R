@@ -380,6 +380,16 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
     if ((verbose >= 1) & (new_tol_R_curr < tol_R_curr)){
       print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
     }
+    if (new_tol_R_curr == tol_R_curr) {
+      new_max_iter_R_outer_curr <- min(
+        floor(max_iter_R_outer_curr * 1.5),
+        max_iter_R_outer - iterations_in_dual_done
+      )
+      if ((verbose >=4) & (new_max_iter_R_outer_curr > max_iter_R_outer_curr)) {
+        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
+      }
+      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
+    }
     tol_R_curr <- new_tol_R_curr
 
     R_curr <- resR$R
@@ -489,6 +499,16 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
     new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
     if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)) {
       print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
+    }
+    if (new_tol_R_curr == tol_R_curr) {
+      new_max_iter_R_outer_curr <- min(
+        floor(max_iter_R_outer_curr * 1.5),
+        max_iter_R_outer - iterations_in_dual_done
+      )
+      if ((verbose >=4) & (new_max_iter_R_outer_curr > max_iter_R_outer_curr)) {
+        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
+      }
+      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
     }
     tol_R_curr <- new_tol_R_curr
 
