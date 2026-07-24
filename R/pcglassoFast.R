@@ -18,7 +18,9 @@
 #' @param solver_R (character) Optimization method for R-step: \code{"dual"} (Fortran,
 #'   default) or \code{"primal"} (C++, alternative).
 #' @param tol_R (double > 0) Inner convergence tolerance for R-step optimization.
-#' @param max_iter_R (integer) Maximum iterations for inner R-step solver.
+#' @param max_iter_R (integer) Baseline maximum iterations for the inner
+#'   R-step solver. For the dual solver, the effective per-column cap is
+#'   increased with the matrix dimension and current outer-iteration budget.
 #' @param max_iter_R_outer (integer) Maximum iterations for R-step dual solver.
 #' @param tol_D (double > 0) Inner convergence tolerance for D-step optimization.
 #' @param max_iter_D_newton (integer) Maximum Newton-Raphson steps in D optimization.
@@ -227,7 +229,19 @@ pcglassoFast <- function(
       )
     }
 
-    R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
+    R_optimizaiton_improved_objective <-
+      R_result$proposed_objective -
+        objective_history[length(objective_history)] > -2 * tolerance
+    if (
+      !is.logical(R_optimizaiton_improved_objective) ||
+        length(R_optimizaiton_improved_objective) != 1L ||
+        is.na(R_optimizaiton_improved_objective)
+    ) {
+      stop(
+        "Could not determine whether the R optimization improved the objective.",
+        call. = FALSE
+      )
+    }
     if (!R_optimizaiton_improved_objective) {
       stop_loop <- TRUE
       if (verbose >= 1) {
