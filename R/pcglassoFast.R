@@ -430,7 +430,7 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
       outer.Maxiter = max_iter_R_outer_curr,
       outer.tol = tol_R_curr,
       qp.Maxiter = max_iter_R,
-      qp.tol = 1e-7,
+      qp.tol = .Machine$double.eps,
       obj.seq = FALSE,
       stopping.rule = "max",
       track.qp.time = FALSE
