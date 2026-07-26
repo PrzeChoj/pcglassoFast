@@ -18,7 +18,9 @@
 #' @param solver_R (character) Optimization method for R-step: \code{"dual"} (Fortran,
 #'   default) or \code{"primal"} (C++, alternative).
 #' @param tol_R (double > 0) Inner convergence tolerance for R-step optimization.
-#' @param max_iter_R (integer) Maximum iterations for inner R-step solver.
+#' @param max_iter_R (integer) Baseline maximum iterations for the inner
+#'   R-step solver. For the dual solver, the effective per-column cap is
+#'   increased with the matrix dimension and current outer-iteration budget.
 #' @param max_iter_R_outer (integer) Maximum iterations for R-step dual solver.
 #' @param tol_D (double > 0) Inner convergence tolerance for D-step optimization.
 #' @param max_iter_D_newton (integer) Maximum Newton-Raphson steps in D optimization.
@@ -227,7 +229,19 @@ pcglassoFast <- function(
       )
     }
 
-    R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
+    R_optimizaiton_improved_objective <-
+      R_result$proposed_objective -
+        objective_history[length(objective_history)] > -2 * tolerance
+    if (
+      !is.logical(R_optimizaiton_improved_objective) ||
+        length(R_optimizaiton_improved_objective) != 1L ||
+        is.na(R_optimizaiton_improved_objective)
+    ) {
+      stop(
+        "Could not determine whether the R optimization improved the objective.",
+        call. = FALSE
+      )
+    }
     if (!R_optimizaiton_improved_objective) {
       stop_loop <- TRUE
       if (verbose >= 1) {
@@ -377,13 +391,24 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
       break
     }
 
-    if (resR$outer.count < max_iter_R_outer_curr) {
-      new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
-      if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)){
-        print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
-      }
-      tol_R_curr <- new_tol_R_curr
+    # decrease `tol_R_curr` every time.
+    # This is better becouse the inner solver uses `tol_R_curr`
+    # to set `thrLasso` which may be the problem here.
+    new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
+    if ((verbose >= 1) & (new_tol_R_curr < tol_R_curr)){
+      print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
     }
+    if (new_tol_R_curr == tol_R_curr) {
+      new_max_iter_R_outer_curr <- min(
+        floor(max_iter_R_outer_curr * 1.5),
+        max_iter_R_outer - iterations_in_dual_done
+      )
+      if ((verbose >=4) & (new_max_iter_R_outer_curr > max_iter_R_outer_curr)) {
+        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
+      }
+      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
+    }
+    tol_R_curr <- new_tol_R_curr
 
     R_curr <- resR$R
     R_inv_curr <- resR$Rinv
@@ -423,7 +448,7 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
       outer.Maxiter = max_iter_R_outer_curr,
       outer.tol = tol_R_curr,
       qp.Maxiter = max_iter_R,
-      qp.tol = 1e-7,
+      qp.tol = .Machine$double.eps,
       obj.seq = FALSE,
       stopping.rule = "max",
       track.qp.time = FALSE
@@ -494,15 +519,22 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
       break  # EXIT repeat loop
     }
 
-    # Adapt tolerance strategy
-    if (resR$outer.count < max_iter_R_outer_curr) {
-      # Primal-dual solver had room to spare -> tighten tolerance
-      new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
-      if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)) {
-        print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
-      }
-      tol_R_curr <- new_tol_R_curr
+    # tighten tolerance
+    new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
+    if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)) {
+      print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
     }
+    if (new_tol_R_curr == tol_R_curr) {
+      new_max_iter_R_outer_curr <- min(
+        floor(max_iter_R_outer_curr * 1.5),
+        max_iter_R_outer - iterations_in_dual_done
+      )
+      if ((verbose >=4) & (new_max_iter_R_outer_curr > max_iter_R_outer_curr)) {
+        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
+      }
+      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
+    }
+    tol_R_curr <- new_tol_R_curr
 
     # Update state & retry
     R_curr <- resR$R_symetric
