@@ -1,12 +1,40 @@
 #include <RcppArmadillo.h>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 // [[Rcpp::depends(RcppArmadillo)]]
 
 namespace {
 
-void box_qp_dense(
+struct BoxQpStatus {
+  double kkt_residual;
+  int iterations;
+  bool converged;
+};
+
+double projected_kkt_residual(
+    const arma::mat& Q,
+    const arma::vec& u,
+    const arma::vec& grad,
+    const double rho,
+    const arma::uword skipped) {
+  double max_residual = 0.0;
+
+  for (arma::uword col = 0; col < Q.n_rows; ++col) {
+    if (col == skipped) continue;
+
+    // This is a diagonally scaled projected-gradient mapping. It is zero
+    // exactly when the box-constrained KKT condition holds for this coordinate.
+    const double candidate = u[col] - grad[col] / (2.0 * Q(col, col));
+    const double projected = std::min(rho, std::max(-rho, candidate));
+    max_residual = std::max(max_residual, std::abs(u[col] - projected));
+  }
+
+  return max_residual / std::max(1.0, std::abs(rho));
+}
+
+BoxQpStatus box_qp_dense(
     const arma::mat& Q,
     arma::vec& u,
     const arma::vec& b,
@@ -15,8 +43,11 @@ void box_qp_dense(
     const double tol,
     arma::vec& grad) {
   grad = 2.0 * Q * (u + b);
-  double objcur = arma::dot(grad, b + u);
-  double objold = objcur;
+  BoxQpStatus status = {
+    std::numeric_limits<double>::infinity(),
+    0,
+    false
+  };
 
   for (int outer = 1; outer <= maxIter; ++outer) {
     for (arma::uword col = 0; col < Q.n_rows; ++col) {
@@ -31,14 +62,20 @@ void box_qp_dense(
       }
     }
 
-    objcur = arma::dot(grad, b + u);
-    const double dlx = std::abs(objcur - objold) / (std::abs(objold) + 1e-6);
-    objold = objcur;
-    if (dlx < tol || outer > maxIter - 1) break;
+    status.iterations = outer;
+    status.kkt_residual = projected_kkt_residual(
+      Q, u, grad, rho, Q.n_rows
+    );
+    if (status.kkt_residual <= tol) {
+      status.converged = true;
+      break;
+    }
   }
+
+  return status;
 }
 
-void box_qp_full_without_column(
+BoxQpStatus box_qp_full_without_column(
     const arma::mat& R,
     const arma::subview_col<double>& b,
     arma::vec& u,
@@ -54,8 +91,11 @@ void box_qp_full_without_column(
   u[skipped] = 0.0;
 
   grad = 2.0 * R * z;
-  double objcur = arma::dot(grad, z);
-  double objold = objcur;
+  BoxQpStatus status = {
+    std::numeric_limits<double>::infinity(),
+    0,
+    false
+  };
 
   for (int outer = 1; outer <= maxIter; ++outer) {
     for (arma::uword col = 0; col < R.n_rows; ++col) {
@@ -74,11 +114,17 @@ void box_qp_full_without_column(
       }
     }
 
-    objcur = arma::dot(grad, z);
-    const double dlx = std::abs(objcur - objold) / (std::abs(objold) + 1e-6);
-    objold = objcur;
-    if (dlx < tol || outer > maxIter - 1) break;
+    status.iterations = outer;
+    status.kkt_residual = projected_kkt_residual(
+      R, u, grad, rho, skipped
+    );
+    if (status.kkt_residual <= tol) {
+      status.converged = true;
+      break;
+    }
   }
+
+  return status;
 }
 
 void primal_dual_sweep_inplace(
@@ -162,11 +208,16 @@ Rcpp::List boxQpCpp(
     int maxIter,
     double tol) {
   arma::vec grad;
-  box_qp_dense(Q, u, b, rho, maxIter, tol, grad);
+  const BoxQpStatus status = box_qp_dense(
+    Q, u, b, rho, maxIter, tol, grad
+  );
 
   return Rcpp::List::create(
     Rcpp::Named("grad_vec") = grad,
-    Rcpp::Named("u") = u
+    Rcpp::Named("u") = u,
+    Rcpp::Named("kkt.residual") = status.kkt_residual,
+    Rcpp::Named("iterations") = status.iterations,
+    Rcpp::Named("converged") = status.converged
   );
 }
 

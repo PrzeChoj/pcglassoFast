@@ -11,7 +11,7 @@
 
 ROptimPrimalDual <-
   function(S, R = NULL, U = NULL, lambda, outer.Maxiter = 100, outer.tol = 10^-5,
-           qp.Maxiter = 1000, qp.tol = 10^-7, obj.seq = FALSE,
+           qp.Maxiter = 1000, qp.tol = 2*.Machine$double.eps, obj.seq = FALSE,
            stopping.rule = c("hybrid", "max"),
            track.qp.time = FALSE) {
     stopping.rule <- match.arg(stopping.rule)
