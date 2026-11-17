@@ -1,4 +1,13 @@
 #' Optimize in R given D
+#'
+#' @param S Covariance matrix used in the dual R-step.
+#' @param R Initial precision matrix.
+#' @param Rinv Initial inverse precision matrix.
+#' @param lambda Non-negative off-diagonal penalty.
+#' @param tol Convergence tolerance for the outer matrix sweeps.
+#' @param max_outer_iter Maximum number of outer matrix sweeps.
+#'
+#' @noRd
 ROptimDual <- function(
     S,
     R,

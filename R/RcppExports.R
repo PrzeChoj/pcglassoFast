@@ -5,6 +5,18 @@ updateLoopCpp <- function(S, Q, Qinv, loglik_s, lambda, tol_inner, max_inner_ite
     .Call(`_pcglassoFast_updateLoopCpp`, S, Q, Qinv, loglik_s, lambda, tol_inner, max_inner_iter)
 }
 
+boxQpCpp <- function(Q, u, b, rho, maxIter, tol) {
+    .Call(`_pcglassoFast_boxQpCpp`, Q, u, b, rho, maxIter, tol)
+}
+
+primalDualSweepCpp <- function(S, R, U, lambda, qpMaxIter, qpTol) {
+    .Call(`_pcglassoFast_primalDualSweepCpp`, S, R, U, lambda, qpMaxIter, qpTol)
+}
+
+primalDualOuterCpp <- function(S, R, U, lambda, outerMaxIter, outerTol, qpMaxIter, qpTol) {
+    .Call(`_pcglassoFast_primalDualOuterCpp`, S, R, U, lambda, outerMaxIter, outerTol, qpMaxIter, qpTol)
+}
+
 updateBeta <- function(beta, Qinv_ii, Qinv_beta, s, lambda, p) {
     invisible(.Call(`_pcglassoFast_updateBeta`, beta, Qinv_ii, Qinv_beta, s, lambda, p))
 }

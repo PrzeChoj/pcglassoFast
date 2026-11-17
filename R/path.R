@@ -17,8 +17,8 @@
 #'   Default: 50.
 #' @param min_lambda_ratio (double in [0, 1]) Ratio \eqn{\lambda_{\min}/\lambda_{\max}}
 #'   used to construct the exponential grid. Default: 0.01.
-#' @param max_edge_fraction (double in (0, 1]) Maximum allowed fraction of nonzero
-#'   off-diagonal entries ("edges") relative to \eqn{p(p-1)}.
+#' @param max_edge_fraction (double in [0, 1]) Maximum allowed fraction of detected
+#'   edges among the \eqn{p(p-1)/2} possible pairs, using \code{edge_tol}.
 #'   Once exceeded, the path computation stops early. Default: 1.0 (no early stopping).
 #'   Values < 1 are only meaningful when \code{lambdas} is decreasing (the default),
 #'   where solutions progress from sparse to dense.
@@ -30,11 +30,20 @@
 #' @param tolerance (double > 0) Outer loop convergence threshold per \eqn{\lambda}; stops when
 #'   objective improvement in a single iteration < tolerance.
 #' @param solver_R (character) Optimization method for R-step: \code{"dual"} (Fortran,
-#'   default) or \code{"primal"} (C++, alternative).
+#'   default), \code{"primal"} (C++), or \code{"primal_dual"} (C++).
 #' @param tol_R,max_iter_R,max_iter_R_outer,tol_D,max_iter_D_newton,max_iter_D_ls,diagonal_Newton
 #'   Tuning parameters passed to \code{\link{pcglassoFast}} for each \eqn{\lambda}.
 #' @param verbose (integer, 0--5) Logging detail. 0 = silent; 1 = termination reason;
 #'   2 = objective; 3--4 = tolerance adaptation; 5 = detailed R-step diagnostics.
+#' @param tol_QP (finite double > 0) Projected KKT tolerance for each box-constrained
+#'   quadratic subproblem of \code{solver_R = "primal_dual"}. Default: \code{1e-10}.
+#'   Passed unchanged to \code{\link{pcglassoFast}} at every \eqn{\lambda}, independently
+#'   of \code{tol_R} and \code{tolerance}. Unused by the other solvers.
+#' @param edge_tol (finite double >= 0) Numerical threshold for detecting edges on
+#'   the R scale: an off-diagonal entry is an edge when \code{abs(R[i,j]) > edge_tol}.
+#'   Default: \code{1e-8}. Use \code{0} for exact comparison with zero. This controls
+#'   graph diagnostics and early stopping, not optimization or statistical significance;
+#'   it does not change the fitted matrices or depend automatically on \code{tol_QP}.
 #'
 #' @details
 #' \strong{Objective Function:}
@@ -53,9 +62,11 @@
 #' \strong{Early Stopping:}
 #'
 #' Path computation can terminate before reaching \code{lambdas[end]} if the number of
-#' unique edges (nonzero off-diagonal entries in the upper triangle) exceeds
+#' unique edges detected using \code{edge_tol} in the upper triangle of R exceeds
 #' \code{max_edge_fraction * p * (p-1) / 2}.
 #' The returned path includes only the values actually computed.
+#' The threshold is stored in the result and used by default when that result is
+#' passed to \code{\link{evaluate_objective_path}}.
 #'
 #' \strong{Lambda Grid Generation:}
 #'
@@ -76,6 +87,13 @@
 #'   \item \code{objective}: Numeric vector of final objective values at each \eqn{\lambda}.
 #'   \item \code{iters}: Numeric vector of iterations needed for convergence per \eqn{\lambda}.
 #'   \item \code{path_optimization_time}: Total runtime of the entire path computation.
+#'   \item \code{qp_diagnostics}: For \code{primal_dual}, a named list in the same
+#'     order as \code{lambdas}, with the same names as \code{R_path}. Each entry is
+#'     the \code{qp_diagnostics} returned by \code{\link{pcglassoFast}} for that
+#'     \eqn{\lambda}; counts are not accumulated across the path. Includes only
+#'     computed points if the path stops early. \code{all_converged} concerns the
+#'     inner QPs, not convergence of the full fit. \code{NULL} for other solvers.
+#'   \item \code{edge_tol}: Numerical edge threshold used for this path.
 #' }
 #'
 #' @seealso
@@ -101,6 +119,11 @@
 #'
 #' # Fit PCGLASSO
 #' result <- pcglassoPath(S, alpha = 0, verbose = 1, nlambda = 6)
+#'
+#' # Use the primal-dual solver and inspect QP diagnostics at the first lambda
+#' result_pd <- pcglassoPath(S, alpha = 0, nlambda = 6,
+#'                          solver_R = "primal_dual", tol_QP = 1e-10)
+#' result_pd$qp_diagnostics[[1]]
 pcglassoPath <- function(
     S,
     alpha,
@@ -115,7 +138,7 @@ pcglassoPath <- function(
     # controls passed to pcglassoFast
     max_iter = 1000,
     tolerance = 1e-3,
-    solver_R = c("dual", "primal"),
+    solver_R = c("dual", "primal", "primal_dual"),
     tol_R = 1e-8,
     max_iter_R = 100,
     max_iter_R_outer = 500000,
@@ -123,9 +146,16 @@ pcglassoPath <- function(
     max_iter_D_newton = 5000,
     max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
-    verbose = 0) {
+    verbose = 0,
+    tol_QP = 1e-10,
+    edge_tol = 1e-8) {
   solver_R <- tolower(solver_R)
   solver_R <- match.arg(solver_R)
+  .validate_edge_tol(edge_tol)
+  if (!is.numeric(tol_QP) || length(tol_QP) != 1L ||
+      !is.finite(tol_QP) || tol_QP <= 0) {
+    stop("tol_QP must be a finite, positive number.", call. = FALSE)
+  }
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
@@ -176,6 +206,7 @@ pcglassoPath <- function(
   # prepare storage
   K <- length(lambdas)
   outW <- outWi <- outD <- outR <- outRi <- vector("list", K)
+  out_qp_diagnostics <- if (solver_R == "primal_dual") vector("list", K) else NULL
   objective_values <- iters <- numeric(K)
 
   # warm start
@@ -207,7 +238,8 @@ pcglassoPath <- function(
       max_iter_D_newton = max_iter_D_newton,
       max_iter_D_ls = max_iter_D_ls,
       diagonal_Newton = diagonal_Newton,
-      verbose = verbose
+      verbose = verbose,
+      tol_QP = tol_QP
     )
 
     # extract
@@ -223,8 +255,14 @@ pcglassoPath <- function(
     outWi[[k]] <- Rinv_curr * ((1/D_curr) %o% (1/D_curr))
     iters[k] <- fit$n_iters
     objective_values[k] <- utils::tail(fit$objective, 1)
-    # compute edge fraction and early stop
-    edge_frac <- (sum(R_curr != 0) - p) / (p * (p - 1))
+    if (!is.null(out_qp_diagnostics)) {
+      out_qp_diagnostics[k] <- list(fit$qp_diagnostics)
+    }
+    # Count undirected edges on the R scale without changing the fitted matrix.
+    edge_mask <- .pcg_edge_mask(R_curr, edge_tol)
+    edge_frac <- if (p > 1L) {
+      sum(edge_mask[upper.tri(edge_mask)]) / (p * (p - 1) / 2)
+    } else 0
     if (edge_frac > max_edge_fraction) {
       break
     }
@@ -246,8 +284,14 @@ pcglassoPath <- function(
   outWi <- outWi[used]
   objective_values <- objective_values[used]
   iters <- iters[used]
+  if (!is.null(out_qp_diagnostics)) {
+    out_qp_diagnostics <- out_qp_diagnostics[used]
+  }
 
   names(outR) <- names(outD) <- names(outW) <- paste0("lam_", round(lambdas, 4))
+  if (!is.null(out_qp_diagnostics)) {
+    names(out_qp_diagnostics) <- names(outR)
+  }
   list(
     lambdas = lambdas,
     R_path = outR,
@@ -257,7 +301,9 @@ pcglassoPath <- function(
     Wi_path = outWi,
     objective = objective_values,
     iters = iters,
-    path_optimization_time = path_time_full
+    path_optimization_time = path_time_full,
+    qp_diagnostics = out_qp_diagnostics,
+    edge_tol = edge_tol
   )
 }
 
@@ -283,6 +329,13 @@ pcglassoPath <- function(
 #' @param gamma (double in [0, 1]) Scaling parameter for the BIC_gamma penalty on model complexity.
 #'   Default: 0.5. Larger values (e.g., 1.0) more heavily penalize additional parameters;
 #'   smaller values (e.g., 0) reduce the complexity penalty. See Details below.
+#' @param edge_tol (finite double >= 0) Numerical threshold for detecting edges on
+#'   the standardized precision scale, \eqn{R_{ij} = P_{ij}/\sqrt{P_{ii}P_{jj}}}.
+#'   An edge is counted when \code{abs(R[i,j]) > edge_tol}. If omitted for a path
+#'   result, its stored \code{edge_tol} is used; otherwise the default is \code{1e-8}.
+#'   Use \code{0} to compare the original precision entries exactly with zero.
+#'   Only edge counts, parameter counts, and BIC penalties use this threshold;
+#'   likelihoods and reconstruction errors use the original matrices.
 #'
 #' @details
 #' \strong{Mathematical Formulas:}
@@ -298,13 +351,14 @@ pcglassoPath <- function(
 #'
 #' \strong{BIC_gamma} (Extended Bayesian Information Criterion, cf. Bogdan et al.):
 #' \deqn{BIC\_gamma_k = -2 * loglik_k + nEdges_k * (log(n) + 4 * gamma * log(p))}
-#' where \eqn{nEdges_k} is the count of nonzero off-diagonal entries in \eqn{P_k}:
-#' \deqn{nEdges_k = (1/2) * (nonzeros(P_k) - p)}
-#' (counts unique edges, excluding the diagonal).
+#' where \eqn{nEdges_k} counts unique pairs \eqn{i < j} with
+#' \eqn{|P_{k,ij}|/\sqrt{P_{k,ii}P_{k,jj}} > \tau}, where \eqn{\tau} is
+#' \code{edge_tol}. With \code{edge_tol = 0}, the original entries are compared
+#' directly to zero without normalization. The diagonal is always excluded.
 #'
 #' \strong{Number of parameters:}
 #' \deqn{n\_param_k = nEdges_k + p}
-#' (non-zero off-diagonal entries plus diagonal entries).
+#' (detected edges plus diagonal entries).
 #'
 #' @return List with elements:
 #' \itemize{
@@ -312,7 +366,7 @@ pcglassoPath <- function(
 #'   \item \code{forbenious}: Numeric vector of Frobenius norms (covariance reconstruction error).
 #'   \item \code{n_param}: Numeric vector of parameter counts.
 #'   \item \code{BIC_gamma}: Numeric vector of BIC_gamma values (for model selection).
-#'   \item \code{nEdges}: Numeric vector of edge counts (number of nonzero off-diagonal entries).
+#'   \item \code{nEdges}: Numeric vector of detected undirected edge counts using \code{edge_tol}.
 #' }
 #'
 #' @seealso
@@ -345,22 +399,30 @@ pcglassoPath <- function(
 #' W_array <- simplify2array(result$W_path)
 #' evals2 <- evaluate_objective_path(W_array, Sigma = S, n = n)
 #' identical(evals, evals2) # TRUE
-evaluate_objective_path <- function(precision_array, Sigma, n, gamma = 0.5) {
+evaluate_objective_path <- function(precision_array, Sigma, n, gamma = 0.5,
+                                    edge_tol = 1e-8) {
   if ("list" %in% methods::is(precision_array)) {
+    if (missing(edge_tol) && !is.null(precision_array$edge_tol)) {
+      edge_tol <- precision_array$edge_tol
+    }
     W <- precision_array$W_path
-    precision_array <- simplify2array(W)
+    # Preserve all three dimensions, including paths of 1 x 1 matrices.
+    precision_array <- array(unlist(W, use.names = FALSE),
+                             dim = c(nrow(W[[1L]]), ncol(W[[1L]]), length(W)))
   }
+  .validate_edge_tol(edge_tol)
   k <- dim(precision_array)[3]
   p <- dim(precision_array)[1]
   loglik <- forbenious <- n_param <- BIC_gamma <- nEdges <- rep(0, k)
 
   for (i in 1:k) {
-    P <- precision_array[, , i]
+    P <- matrix(precision_array[, , i], nrow = p, ncol = p)
     L.P <- chol(P)
     loglik[i] <- n * (sum(log(diag(L.P))) - 0.5 * sum(diag(P %*% Sigma)) - 0.5 * p * log(2 * pi))
     forbenious[i] <- sum((solve(P) - Sigma)^2)
-    n_param[i] <- (p * p - sum(P == 0) - p) / 2 + p
-    nEdges[i] <- (sum(P != 0) - p) / 2
+    edge_mask <- .pcg_edge_mask(P, edge_tol)
+    nEdges[i] <- sum(edge_mask[upper.tri(edge_mask)])
+    n_param[i] <- nEdges[i] + p
     BIC_gamma[i] <- -2 * loglik[i] + nEdges[i] * (log(n) + 4 * gamma * log(p))
   }
 

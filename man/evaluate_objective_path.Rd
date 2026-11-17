@@ -4,7 +4,13 @@
 \alias{evaluate_objective_path}
 \title{Evaluate solutions along a regularization path}
 \usage{
-evaluate_objective_path(precision_array, Sigma, n, gamma = 0.5)
+evaluate_objective_path(
+  precision_array,
+  Sigma,
+  n,
+  gamma = 0.5,
+  edge_tol = 1e-08
+)
 }
 \arguments{
 \item{precision_array}{Either:
@@ -19,6 +25,14 @@ BIC computation.}
 \item{gamma}{(double in [0, 1]) Scaling parameter for the BIC_gamma penalty on model complexity.
 Default: 0.5. Larger values (e.g., 1.0) more heavily penalize additional parameters;
 smaller values (e.g., 0) reduce the complexity penalty. See Details below.}
+
+\item{edge_tol}{(finite double >= 0) Numerical threshold for detecting edges on
+the standardized precision scale, \eqn{R_{ij} = P_{ij}/\sqrt{P_{ii}P_{jj}}}.
+An edge is counted when \code{abs(R[i,j]) > edge_tol}. If omitted for a path
+result, its stored \code{edge_tol} is used; otherwise the default is \code{1e-8}.
+Use \code{0} to compare the original precision entries exactly with zero.
+Only edge counts, parameter counts, and BIC penalties use this threshold;
+likelihoods and reconstruction errors use the original matrices.}
 }
 \value{
 List with elements:
@@ -27,7 +41,7 @@ List with elements:
   \item \code{forbenious}: Numeric vector of Frobenius norms (covariance reconstruction error).
   \item \code{n_param}: Numeric vector of parameter counts.
   \item \code{BIC_gamma}: Numeric vector of BIC_gamma values (for model selection).
-  \item \code{nEdges}: Numeric vector of edge counts (number of nonzero off-diagonal entries).
+  \item \code{nEdges}: Numeric vector of detected undirected edge counts using \code{edge_tol}.
 }
 }
 \description{
@@ -54,13 +68,14 @@ empirical covariance, and p the dimension.
 
 \strong{BIC_gamma} (Extended Bayesian Information Criterion, cf. Bogdan et al.):
 \deqn{BIC\_gamma_k = -2 * loglik_k + nEdges_k * (log(n) + 4 * gamma * log(p))}
-where \eqn{nEdges_k} is the count of nonzero off-diagonal entries in \eqn{P_k}:
-\deqn{nEdges_k = (1/2) * (nonzeros(P_k) - p)}
-(counts unique edges, excluding the diagonal).
+where \eqn{nEdges_k} counts unique pairs \eqn{i < j} with
+\eqn{|P_{k,ij}|/\sqrt{P_{k,ii}P_{k,jj}} > \tau}, where \eqn{\tau} is
+\code{edge_tol}. With \code{edge_tol = 0}, the original entries are compared
+directly to zero without normalization. The diagonal is always excluded.
 
 \strong{Number of parameters:}
 \deqn{n\_param_k = nEdges_k + p}
-(non-zero off-diagonal entries plus diagonal entries).
+(detected edges plus diagonal entries).
 }
 \examples{
 p <- 7

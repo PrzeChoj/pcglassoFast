@@ -16,9 +16,15 @@
 #' @param tolerance (double > 0) Outer loop convergence threshold; stops when
 #'   objective improvement in a single iteration < tolerance.
 #' @param solver_R (character) Optimization method for R-step: \code{"dual"} (Fortran,
-#'   default) or \code{"primal"} (C++, alternative).
+#'   default), \code{"primal"} (C++), or \code{"primal_dual"} (C++).
 #' @param tol_R (double > 0) Inner convergence tolerance for R-step optimization.
-#' @param max_iter_R (integer) Maximum iterations for inner R-step solver.
+#' @param tol_QP (finite double > 0) Projected KKT tolerance for each box-constrained
+#'   quadratic subproblem of \code{solver_R = "primal_dual"}. Default: \code{1e-10}.
+#'   This controls the inner QP, independently of \code{tol_R} (R sweeps) and
+#'   \code{tolerance} (the full fit). It is unused by the other solvers.
+#' @param max_iter_R (integer) Baseline maximum iterations for the inner
+#'   R-step solver. For the dual solver, the effective per-column cap is
+#'   increased with the matrix dimension and current outer-iteration budget.
 #' @param max_iter_R_outer (integer) Maximum iterations for R-step dual solver.
 #' @param tol_D (double > 0) Inner convergence tolerance for D-step optimization.
 #' @param max_iter_D_newton (integer) Maximum Newton-Raphson steps in D optimization.
@@ -55,6 +61,14 @@
 #'   \item \code{n_iters}: Number of outer loop iterations.
 #'   \item \code{objective}: Objective value history.
 #'   \item \code{optimization_time}: Runtime of the optimization.
+#'   \item \code{qp_diagnostics}: For \code{primal_dual}, cumulative QP diagnostics
+#'     across all attempted R steps, including rejected proposals: \code{calls},
+#'     \code{iterations}, \code{limit_hits}, \code{unconverged}, \code{tolerance},
+#'     and \code{all_converged}. A limit hit also counts a QP that meets its
+#'     criterion on its last allowed iteration; \code{unconverged} counts only
+#'     QPs that did not meet the criterion. \code{all_converged} describes these
+#'     inner solves, not convergence or global optimality of the full fit.
+#'     \code{NULL} for the other solvers.
 #' }
 #'
 #' @seealso \code{\link{pcglassoPath}} for regularization path computation.
@@ -80,15 +94,20 @@ pcglassoFast <- function(
     R0_inv = solve(R0),
     D0 = rep(1, nrow(S))/sqrt(diag(S)),
     max_iter = 1000, tolerance = 1e-3,
-    solver_R = c("dual", "primal"),
+    solver_R = c("dual", "primal", "primal_dual"),
     tol_R = 1e-8,
-    max_iter_R = 100, max_iter_R_outer = 500000,
+    max_iter_R = 20, max_iter_R_outer = 5000,
     tol_D = 1e-8,
     max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
-    verbose = 0) {
+    verbose = 0,
+    tol_QP = 1e-10) {
   solver_R <- tolower(solver_R)
   solver_R <- match.arg(solver_R)
+  if (!is.numeric(tol_QP) || length(tol_QP) != 1L ||
+      !is.finite(tol_QP) || tol_QP <= 0) {
+    stop("tol_QP must be a finite, positive number.", call. = FALSE)
+  }
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
@@ -146,6 +165,10 @@ pcglassoFast <- function(
   D <- D0 * sqrt(diag(S))
   R <- R0
   R_inv <- R0_inv
+  R_dual_box <- NULL
+  qp_diagnostics <- if (solver_R == "primal_dual") {
+    list(calls = 0, iterations = 0, limit_hits = 0, unconverged = 0)
+  } else NULL
   C <- cov2cor(S)
   strating_time <- Sys.time()
   digits_to_print <- max(0, -floor(log10(tolerance)))
@@ -206,11 +229,45 @@ pcglassoFast <- function(
     R_step <- switch(
       solver_R,
       "dual" = R_step_dual,
-      "primal" = R_step_primal
+      "primal" = R_step_primal,
+      "primal_dual" = R_step_primalDual
     )
-    R_result <- R_step(C, D, lambda, alpha, R, R_inv, tolerance, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, objective_history[length(objective_history)], verbose, length(objective_history)/2)
+    if (solver_R == "primal_dual") {
+      R_result <- R_step(
+        C, D, lambda, alpha, R, R_inv, tolerance, times_tol_R_decrease,
+        tol_R, tol_R_curr, max_iter_R, max_iter_R_outer,
+        objective_history[length(objective_history)], verbose,
+        length(objective_history) / 2,
+        R_dual_box_curr = R_dual_box,
+        tol_QP = tol_QP
+      )
+    } else {
+      R_result <- R_step(
+        C, D, lambda, alpha, R, R_inv, tolerance, times_tol_R_decrease,
+        tol_R, tol_R_curr, max_iter_R, max_iter_R_outer,
+        objective_history[length(objective_history)], verbose,
+        length(objective_history) / 2
+      )
+    }
 
-    R_optimizaiton_improved_objective <- (R_result$proposed_objective - objective_history[length(objective_history)] > -2 * tolerance)
+    if (solver_R == "primal_dual" && !is.null(R_result$qp_diagnostics)) {
+      for (name in names(qp_diagnostics)) {
+        qp_diagnostics[[name]] <- qp_diagnostics[[name]] + R_result$qp_diagnostics[[name]]
+      }
+    }
+    R_optimizaiton_improved_objective <-
+      R_result$proposed_objective -
+        objective_history[length(objective_history)] > -2 * tolerance
+    if (
+      !is.logical(R_optimizaiton_improved_objective) ||
+        length(R_optimizaiton_improved_objective) != 1L ||
+        is.na(R_optimizaiton_improved_objective)
+    ) {
+      stop(
+        "Could not determine whether the R optimization improved the objective.",
+        call. = FALSE
+      )
+    }
     if (!R_optimizaiton_improved_objective) {
       stop_loop <- TRUE
       if (verbose >= 1) {
@@ -222,6 +279,7 @@ pcglassoFast <- function(
     R <- R_result$R
     R_symetric <- R_result$R_symetric
     R_inv <- R_result$R_inv
+    R_dual_box <- if (solver_R == "primal_dual") R_result$dual_box else NULL
     improvement_R <- R_result$proposed_objective - objective_history[length(objective_history)]
     objective_history <- c(objective_history, R_result$proposed_objective)
 
@@ -255,6 +313,18 @@ pcglassoFast <- function(
   R <- (R + t(R))/2
   D <- as.vector(D)
   D <- D / sqrt(diag(S))
+  if (is.null(R_inv)) {
+    R_inv <- solve(R)
+  }
+  if (!is.null(qp_diagnostics)) {
+    qp_diagnostics$tolerance <- tol_QP
+    qp_diagnostics$all_converged <- qp_diagnostics$unconverged == 0
+    if (verbose >= 1 && !qp_diagnostics$all_converged) {
+      message(qp_diagnostics$unconverged, " of ", qp_diagnostics$calls,
+              " QP solves reached their iteration limit without meeting tol_QP (",
+              tol_QP, "). See qp_diagnostics.")
+    }
+  }
   list(
     "Sinv" = R * (D %o% D),
     "S" = R_inv * ((1 / D) %o% (1 / D)),
@@ -263,7 +333,8 @@ pcglassoFast <- function(
     "R_inv" = R_inv,
     "n_iters" = floor(length(objective_history)/2),
     "objective" = objective_history,
-    "optimization_time" = optimization_time
+    "optimization_time" = optimization_time,
+    "qp_diagnostics" = qp_diagnostics
   )
 }
 
@@ -273,10 +344,8 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
   max_iter_R_outer_curr <- 100
 
   S_for_dual <- C * (D %o% D)
-  iterations_in_R_done <- -1
   iterations_in_dual_done <- 0
   repeat {
-    iterations_in_R_done <- iterations_in_R_done + 1
     if (verbose >= 5) {
       print("=== R step ===")
       print(paste0("tol_R_curr = ", tol_R_curr))
@@ -336,37 +405,47 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
         }))
     }
 
-    if (iterations_in_R_done >= max_iter_R) {
-      # no improvement can be made
+    if (iterations_in_dual_done >= max_iter_R_outer) {
+      # reached the maximum number of dual iterations for the R optimization
       if (verbose >= 2) {
-        print("TODO: end R optim")
+        print("Ending dual R optimization at max_iter_R_outer")
       }
       if (!R_positive_definite) {
         # fix R to be positive definite
-        warn(paste0("R optimization resulted in non-positive definite matrix"))
+        warning("R optimization resulted in non-positive definite matrix")
         desired_smallest_eigen_value <- 0.01
-        x <- (1-desired_smallest_eigen_value) / (1-smallest_eigen_value)
-        resR$R_symetric <- x*resR$R_symetric + diag(1-x, p)
+        x <- (1 - desired_smallest_eigen_value) / (1 - smallest_eigen_value)
+
+        resR$R_symetric <- x * resR$R_symetric + diag(1 - x, p)
+        resR$R <- resR$R_symetric
         resR$Rinv <- solve(resR$R_symetric)
 
-        proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+        proposed_objective <- function_to_optimize(
+          resR$R_symetric, D, C, lambda, alpha
+        )
       }
       break
     }
 
-    if (resR$outer.count < max_iter_R_outer) {
-      new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
-      if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)){
-        print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
-      }
-      tol_R_curr <- new_tol_R_curr
-    } else {
-      new_max_iter_R_outer_curr <- min(max_iter_R_outer_curr * 10, max_iter_R_outer)
-      if ((verbose >= 4) & (max_iter_R_outer_curr < new_max_iter_R_outer_curr)){
+    # decrease `tol_R_curr` every time.
+    # This is better becouse the inner solver uses `tol_R_curr`
+    # to set `thrLasso` which may be the problem here.
+    new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
+    if ((verbose >= 1) & (new_tol_R_curr < tol_R_curr)){
+      print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
+    }
+    if (new_tol_R_curr == tol_R_curr) {
+      new_max_iter_R_outer_curr <- min(
+        floor(max_iter_R_outer_curr * 1.5),
+        max_iter_R_outer - iterations_in_dual_done
+      )
+      if ((verbose >=4) & (new_max_iter_R_outer_curr > max_iter_R_outer_curr)) {
         print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
       }
       max_iter_R_outer_curr <- new_max_iter_R_outer_curr
     }
+    tol_R_curr <- new_tol_R_curr
+
     R_curr <- resR$R
     R_inv_curr <- resR$Rinv
   }
@@ -377,6 +456,139 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
     R_inv = resR$Rinv,
     proposed_objective = proposed_objective,
     iterations_done = iterations_in_dual_done
+  )
+}
+
+
+R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number, R_dual_box_curr = NULL, tol_QP = 1e-10) {
+  digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
+  p <- dim(C)[1]
+
+  S_for_primal_dual <- C * (D %o% D)
+  max_iter_R_outer_curr <- 100
+
+  iterations_in_dual_done <- 0
+  qp_diagnostics <- list(calls = 0, iterations = 0, limit_hits = 0, unconverged = 0)
+
+  repeat {
+    if (verbose >= 5) {
+      print("=== R step (Primal-Dual) ===")
+      print(paste0("tol_R_curr = ", tol_R_curr))
+      print(paste0("outer.Maxiter = ", max_iter_R_outer_curr))
+    }
+
+    resR <- ROptimPrimalDual(
+      S = S_for_primal_dual,
+      R = R_curr,
+      U = R_dual_box_curr,
+      lambda = lambda,
+      outer.Maxiter = max_iter_R_outer_curr,
+      outer.tol = tol_R_curr,
+      qp.Maxiter = max_iter_R,
+      qp.tol = tol_QP,
+      obj.seq = FALSE,
+      stopping.rule = "max",
+      track.qp.time = FALSE
+    )
+    for (name in names(qp_diagnostics)) {
+      qp_diagnostics[[name]] <- qp_diagnostics[[name]] + resR$qp_diagnostics[[name]]
+    }
+
+    if ((!is.null(resR$Rinv) && any(is.nan(resR$Rinv))) | any(is.nan(resR$R_symetric))) {
+      warn("NaNs introduced in primal-dual calculations")
+      return()
+    }
+
+    proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
+    iterations_in_dual_done <- iterations_in_dual_done + resR$outer.count
+
+    if (verbose >= 5) {
+      print("=== After R step (Primal-Dual) ===")
+      print(paste0("objective: ", round(proposed_objective, digits_to_print)))
+    }
+
+    # Check if objective improved
+    objective_is_better <- (proposed_objective > prev_objective - tolerance_full_optimization * 0.1)
+
+    # Check if R is positive definite
+    smallest_eigen_value <- eigen(resR$R_symetric, TRUE, TRUE)$values[p]
+    R_positive_definite <- (smallest_eigen_value > 0)
+
+    if (objective_is_better & R_positive_definite) {
+      # Success: objective improved and R is valid
+      if (verbose >= 2) {
+        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_in_dual_done, " iters of R optim"))
+      }
+      break  # ← EXIT repeat loop
+    }
+
+    # Diagnose why continuing
+    if (verbose >= 4) {
+      print(paste0(
+        "Continue R optimization as ",
+        if (!objective_is_better) {
+          paste0("objective has not yet improved (objective = ",
+                 round(proposed_objective, digits_to_print),
+                 " prev objective = ", round(prev_objective, digits_to_print), ")")
+        } else {
+          paste0("R matrix was not positive definite (eigen value ",
+                 round(smallest_eigen_value, digits_to_print), ")")
+        }))
+    }
+
+    # Check iteration limit
+    if (iterations_in_dual_done >= max_iter_R_outer) {
+      if (verbose >= 2) {
+        print("Ending primal-dual R optimization at max_iter_R_outer")
+      }
+
+      if (!R_positive_definite) {
+        # fix R to be positive definite
+        warning("R optimization resulted in non-positive definite matrix")
+        desired_smallest_eigen_value <- 0.01
+        x <- (1 - desired_smallest_eigen_value) / (1 - smallest_eigen_value)
+
+        resR$R_symetric <- x * resR$R_symetric + diag(1 - x, p)
+        resR$R <- resR$R_symetric
+        resR$Rinv <- NA
+
+        proposed_objective <- function_to_optimize(
+          resR$R_symetric, D, C, lambda, alpha
+        )
+      }
+      break  # EXIT repeat loop
+    }
+
+    # tighten tolerance
+    new_tol_R_curr <- max(tol_R_curr / times_tol_R_decrease, tol_R)
+    if ((verbose >= 4) & (new_tol_R_curr < tol_R_curr)) {
+      print(paste0("Decreasing tol_R_curr to ", new_tol_R_curr))
+    }
+    if (new_tol_R_curr == tol_R_curr) {
+      new_max_iter_R_outer_curr <- min(
+        floor(max_iter_R_outer_curr * 1.5),
+        max_iter_R_outer - iterations_in_dual_done
+      )
+      if ((verbose >=4) & (new_max_iter_R_outer_curr > max_iter_R_outer_curr)) {
+        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
+      }
+      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
+    }
+    tol_R_curr <- new_tol_R_curr
+
+    # Update state & retry
+    R_curr <- resR$R_symetric
+    R_dual_box_curr <- resR$dual_box
+  }
+
+  list(
+    R = resR$R_symetric,
+    R_symetric = resR$R_symetric,
+    R_inv = resR$Rinv,
+    dual_box = resR$dual_box,
+    proposed_objective = proposed_objective,
+    iterations_done = iterations_in_dual_done,
+    qp_diagnostics = qp_diagnostics
   )
 }
 

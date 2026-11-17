@@ -16,7 +16,7 @@ pcglassoPath(
   D0 = rep(1, nrow(S))/sqrt(diag(S)),
   max_iter = 1000,
   tolerance = 0.001,
-  solver_R = c("dual", "primal"),
+  solver_R = c("dual", "primal", "primal_dual"),
   tol_R = 1e-08,
   max_iter_R = 100,
   max_iter_R_outer = 5e+05,
@@ -24,7 +24,9 @@ pcglassoPath(
   max_iter_D_newton = 5000,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
-  verbose = 0
+  verbose = 0,
+  tol_QP = 1e-10,
+  edge_tol = 1e-08
 )
 }
 \arguments{
@@ -45,8 +47,8 @@ Default: 50.}
 \item{min_lambda_ratio}{(double in [0, 1]) Ratio \eqn{\lambda_{\min}/\lambda_{\max}}
 used to construct the exponential grid. Default: 0.01.}
 
-\item{max_edge_fraction}{(double in (0, 1]) Maximum allowed fraction of nonzero
-off-diagonal entries ("edges") relative to \eqn{p(p-1)}.
+\item{max_edge_fraction}{(double in [0, 1]) Maximum allowed fraction of detected
+edges among the \eqn{p(p-1)/2} possible pairs, using \code{edge_tol}.
 Once exceeded, the path computation stops early. Default: 1.0 (no early stopping).
 Values < 1 are only meaningful when \code{lambdas} is decreasing (the default),
 where solutions progress from sparse to dense.}
@@ -63,12 +65,23 @@ Should be left at default unless providing a warm-start solution.}
 objective improvement in a single iteration < tolerance.}
 
 \item{solver_R}{(character) Optimization method for R-step: \code{"dual"} (Fortran,
-default) or \code{"primal"} (C++, alternative).}
+default), \code{"primal"} (C++), or \code{"primal_dual"} (C++).}
 
 \item{tol_R, max_iter_R, max_iter_R_outer, tol_D, max_iter_D_newton, max_iter_D_ls, diagonal_Newton}{Tuning parameters passed to \code{\link{pcglassoFast}} for each \eqn{\lambda}.}
 
 \item{verbose}{(integer, 0--5) Logging detail. 0 = silent; 1 = termination reason;
 2 = objective; 3--4 = tolerance adaptation; 5 = detailed R-step diagnostics.}
+
+\item{tol_QP}{(finite double > 0) Projected KKT tolerance for each box-constrained
+quadratic subproblem of \code{solver_R = "primal_dual"}. Default: \code{1e-10}.
+Passed unchanged to \code{\link{pcglassoFast}} at every \eqn{\lambda}, independently
+of \code{tol_R} and \code{tolerance}. Unused by the other solvers.}
+
+\item{edge_tol}{(finite double >= 0) Numerical threshold for detecting edges on
+the R scale: an off-diagonal entry is an edge when \code{abs(R[i,j]) > edge_tol}.
+Default: \code{1e-8}. Use \code{0} for exact comparison with zero. This controls
+graph diagnostics and early stopping, not optimization or statistical significance;
+it does not change the fitted matrices or depend automatically on \code{tol_QP}.}
 }
 \value{
 List with elements:
@@ -83,6 +96,13 @@ List with elements:
   \item \code{objective}: Numeric vector of final objective values at each \eqn{\lambda}.
   \item \code{iters}: Numeric vector of iterations needed for convergence per \eqn{\lambda}.
   \item \code{path_optimization_time}: Total runtime of the entire path computation.
+  \item \code{qp_diagnostics}: For \code{primal_dual}, a named list in the same
+    order as \code{lambdas}, with the same names as \code{R_path}. Each entry is
+    the \code{qp_diagnostics} returned by \code{\link{pcglassoFast}} for that
+    \eqn{\lambda}; counts are not accumulated across the path. Includes only
+    computed points if the path stops early. \code{all_converged} concerns the
+    inner QPs, not convergence of the full fit. \code{NULL} for other solvers.
+  \item \code{edge_tol}: Numerical edge threshold used for this path.
 }
 }
 \description{
@@ -108,9 +128,11 @@ fitting each \eqn{\lambda} independently, especially when \eqn{\lambda} values a
 \strong{Early Stopping:}
 
 Path computation can terminate before reaching \code{lambdas[end]} if the number of
-unique edges (nonzero off-diagonal entries in the upper triangle) exceeds
+unique edges detected using \code{edge_tol} in the upper triangle of R exceeds
 \code{max_edge_fraction * p * (p-1) / 2}.
 The returned path includes only the values actually computed.
+The threshold is stored in the result and used by default when that result is
+passed to \code{\link{evaluate_objective_path}}.
 
 \strong{Lambda Grid Generation:}
 
@@ -133,6 +155,11 @@ S <- cov(Z)
 
 # Fit PCGLASSO
 result <- pcglassoPath(S, alpha = 0, verbose = 1, nlambda = 6)
+
+# Use the primal-dual solver and inspect QP diagnostics at the first lambda
+result_pd <- pcglassoPath(S, alpha = 0, nlambda = 6,
+                         solver_R = "primal_dual", tol_QP = 1e-10)
+result_pd$qp_diagnostics[[1]]
 }
 \seealso{
 \code{\link{pcglassoFast}} for a single-lambda optimization.

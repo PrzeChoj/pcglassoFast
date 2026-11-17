@@ -103,8 +103,21 @@ cov2cor_inv <- function(C, diagSigma) {
 #'
 #' @param Q Numeric p x p symmetric matrix of true values.
 #' @param Q_est Numeric p x p symmetric matrix of estimates; must match dims of Q.
+#' @param edge_tol Finite, non-negative threshold for estimated edges after
+#'   standardizing \code{Q_est} to unit diagonal. Default: \code{1e-8}.
+#'   A positive threshold requires finite, positive diagonal entries in
+#'   \code{Q_est}. Use \code{0} to classify exact nonzeros without normalization,
+#'   including for symmetric matrices without a positive diagonal.
 #'
 #' @details
+#' For \code{edge_tol > 0}, the off-diagonal estimated edge mask
+#' \eqn{A_{est,ij}} is one when
+#' \eqn{|Q_{est,ij}| / \sqrt{Q_{est,ii} Q_{est,jj}} > \mathtt{edge\_tol}}
+#' and zero otherwise. For \code{edge_tol = 0}, it is one exactly when
+#' \eqn{Q_{est,ij} \ne 0}. Ground-truth zeros and nonzeros are always determined
+#' exactly from \code{Q}. Only the four classification rates use this estimated
+#' edge mask; all Frobenius norms and RMSE values use the original matrices.
+#'
 #' The function computes 12 metrics, grouped by type:
 #'
 #' \strong{Overall reconstruction error:}
@@ -127,10 +140,10 @@ cov2cor_inv <- function(C, diagSigma) {
 #'   \item `frob_offdiag_zero`: Frobenius norm on off-diagonal entries where Q[i,j] = 0 (true zeros).
 #'   \item `rmse_offdiag_zero`: RMSE on true zeros (divided by count of true zeros).
 #'   \item `true_non0_rate`: Proportion of true zeros correctly estimated as zero.
-#'         Formula: \eqn{P(Q\_est[i,j] = 0 | Q[i,j] = 0)}{P(Q_est[i,j] = 0 | Q[i,j] = 0)}
+#'         Formula: \eqn{P(A_{est,ij} = 0 \mid Q_{ij} = 0)}.
 #'         (Higher is better.)
 #'   \item `false_non0_rate`: Proportion of true zeros incorrectly estimated as nonzero.
-#'         Formula: \eqn{P(Q\_est[i,j] != 0 | Q[i,j] = 0)}{P(Q_est[i,j] != 0 | Q[i,j] = 0)}
+#'         Formula: \eqn{P(A_{est,ij} = 1 \mid Q_{ij} = 0)}.
 #'         (Lower is better; false positives in the sparsity pattern.)
 #' }
 #'
@@ -139,10 +152,10 @@ cov2cor_inv <- function(C, diagSigma) {
 #'   \item `frob_offdiag_nonzero`: Frobenius norm on off-diagonal entries where Q[i,j] != 0 (true edges).
 #'   \item `rmse_offdiag_nonzero`: RMSE on true nonzero entries.
 #'   \item `true_0_rate`: Proportion of true nonzeros correctly estimated as nonzero.
-#'         Formula: \eqn{P(Q\_est[i,j] != 0 | Q[i,j] != 0)}{P(Q_est[i,j] != 0 | Q[i,j] != 0)}
+#'         Formula: \eqn{P(A_{est,ij} = 1 \mid Q_{ij} \ne 0)}.
 #'         (Higher is better; sensitivity/power.)
 #'   \item `false_0_rate`: Proportion of true nonzeros incorrectly estimated as zero.
-#'         Formula: \eqn{P(Q\_est[i,j] = 0 | Q[i,j] != 0)}{P(Q_est[i,j] = 0 | Q[i,j] != 0)}
+#'         Formula: \eqn{P(A_{est,ij} = 0 \mid Q_{ij} \ne 0)}.
 #'         (Lower is better; false negatives in the sparsity pattern.)
 #' }
 #'
@@ -159,15 +172,16 @@ cov2cor_inv <- function(C, diagSigma) {
 #' p <- 5
 #' M <- matrix(rnorm(p^2), p, p)
 #' Q <- (M + t(M)) / 2
-#' diag(Q) <- runif(p, 0, 2)
+#' diag(Q) <- 2
 #' Q[1, 3] <- Q[3, 1] <- 0 # enforce some zeros
 #' Q <- (Q + t(Q)) / 2
 #' E <- Q + matrix(rnorm(p^2, 0, 0.1), p, p)
 #' E <- (E + t(E)) / 2
+#' diag(E) <- 2.1
 #' E[2, 4] <- E[4, 2] <- 0 # drop one entry
 #' compare_matrices(Q, E)
 #' @export
-compare_matrices <- function(Q, Q_est) {
+compare_matrices <- function(Q, Q_est, edge_tol = 1e-8) {
   if (!is.matrix(Q) || !is.matrix(Q_est) || any(dim(Q) != dim(Q_est))) {
     stop("Q and Q_est must be numeric matrices of the same dimensions.")
   }
@@ -175,6 +189,7 @@ compare_matrices <- function(Q, Q_est) {
   # ensure symmetry
   if (any(abs(Q - t(Q)) > sqrt(.Machine$double.eps))) stop("Q must be symmetric.")
   if (any(abs(Q_est - t(Q_est)) > sqrt(.Machine$double.eps))) stop("Q_est must be symmetric.")
+  mask_est <- .pcg_edge_mask(Q_est, edge_tol)
 
   # elementwise difference
   D <- Q_est - Q
@@ -205,14 +220,14 @@ compare_matrices <- function(Q, Q_est) {
   rmse_offdiag_nonzero <- if (n_nz > 0) sqrt(sq_nz / n_nz) else NA_real_
 
   # false positive/negative rates
-  # false positive: Q==0 & Q_est!=0 among Q==0
-  n_fp <- sum(mask_zero & (Q_est != 0))
-  n_tp <- sum(mask_zero & (Q_est == 0))
+  # false positive: estimated edge among exact ground-truth zeros
+  n_fp <- sum(mask_zero & mask_est)
+  n_tp <- sum(mask_zero & !mask_est)
   false_non0_rate <- if (n_zero > 0) n_fp / n_zero else NA_real_
   true_non0_rate <- if (n_zero > 0) n_tp / n_zero else NA_real_
-  # false negative: Q!=0 & Q_est==0 among Q!=0
-  n_fn <- sum(mask_nz & (Q_est == 0))
-  n_tn <- sum(mask_nz & (Q_est != 0))
+  # false negative: estimated zero among exact ground-truth nonzeros
+  n_fn <- sum(mask_nz & !mask_est)
+  n_tn <- sum(mask_nz & mask_est)
   false_0_rate <- if (n_nz > 0) n_fn / n_nz else NA_real_
   true_0_rate <- if (n_nz > 0) n_tn / n_nz else NA_real_
 

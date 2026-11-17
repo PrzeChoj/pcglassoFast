@@ -13,15 +13,16 @@ pcglassoFast(
   D0 = rep(1, nrow(S))/sqrt(diag(S)),
   max_iter = 1000,
   tolerance = 0.001,
-  solver_R = c("dual", "primal"),
+  solver_R = c("dual", "primal", "primal_dual"),
   tol_R = 1e-08,
-  max_iter_R = 100,
-  max_iter_R_outer = 5e+05,
+  max_iter_R = 20,
+  max_iter_R_outer = 5000,
   tol_D = 1e-08,
   max_iter_D_newton = 5000,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
-  verbose = 0
+  verbose = 0,
+  tol_QP = 1e-10
 )
 }
 \arguments{
@@ -44,11 +45,13 @@ Should be left at default unless providing a warm-start solution.}
 objective improvement in a single iteration < tolerance.}
 
 \item{solver_R}{(character) Optimization method for R-step: \code{"dual"} (Fortran,
-default) or \code{"primal"} (C++, alternative).}
+default), \code{"primal"} (C++), or \code{"primal_dual"} (C++).}
 
 \item{tol_R}{(double > 0) Inner convergence tolerance for R-step optimization.}
 
-\item{max_iter_R}{(integer) Maximum iterations for inner R-step solver.}
+\item{max_iter_R}{(integer) Baseline maximum iterations for the inner
+R-step solver. For the dual solver, the effective per-column cap is
+increased with the matrix dimension and current outer-iteration budget.}
 
 \item{max_iter_R_outer}{(integer) Maximum iterations for R-step dual solver.}
 
@@ -63,6 +66,11 @@ approximation (FALSE) in D-step Newton method.}
 
 \item{verbose}{(integer, 0--5) Logging detail. 0 = silent; 1 = termination reason;
 2 = objective; 3--4 = tolerance adaptation; 5 = detailed R-step diagnostics.}
+
+\item{tol_QP}{(finite double > 0) Projected KKT tolerance for each box-constrained
+quadratic subproblem of \code{solver_R = "primal_dual"}. Default: \code{1e-10}.
+This controls the inner QP, independently of \code{tol_R} (R sweeps) and
+\code{tolerance} (the full fit). It is unused by the other solvers.}
 }
 \value{
 List with elements:
@@ -75,6 +83,14 @@ List with elements:
   \item \code{n_iters}: Number of outer loop iterations.
   \item \code{objective}: Objective value history.
   \item \code{optimization_time}: Runtime of the optimization.
+  \item \code{qp_diagnostics}: For \code{primal_dual}, cumulative QP diagnostics
+    across all attempted R steps, including rejected proposals: \code{calls},
+    \code{iterations}, \code{limit_hits}, \code{unconverged}, \code{tolerance},
+    and \code{all_converged}. A limit hit also counts a QP that meets its
+    criterion on its last allowed iteration; \code{unconverged} counts only
+    QPs that did not meet the criterion. \code{all_converged} describes these
+    inner solves, not convergence or global optimality of the full fit.
+    \code{NULL} for the other solvers.
 }
 }
 \description{
