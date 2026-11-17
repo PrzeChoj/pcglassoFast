@@ -16,7 +16,7 @@ pcglassoPath(
   D0 = rep(1, nrow(S))/sqrt(diag(S)),
   max_iter = 1000,
   tolerance = 0.001,
-  solver_R = c("dual", "primal"),
+  solver_R = c("dual", "primal", "primal_dual"),
   tol_R = 1e-08,
   max_iter_R = 100,
   max_iter_R_outer = 5e+05,
@@ -24,7 +24,8 @@ pcglassoPath(
   max_iter_D_newton = 5000,
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
-  verbose = 0
+  verbose = 0,
+  tol_QP = 1e-10
 )
 }
 \arguments{
@@ -63,12 +64,17 @@ Should be left at default unless providing a warm-start solution.}
 objective improvement in a single iteration < tolerance.}
 
 \item{solver_R}{(character) Optimization method for R-step: \code{"dual"} (Fortran,
-default) or \code{"primal"} (C++, alternative).}
+default), \code{"primal"} (C++), or \code{"primal_dual"} (C++).}
 
 \item{tol_R, max_iter_R, max_iter_R_outer, tol_D, max_iter_D_newton, max_iter_D_ls, diagonal_Newton}{Tuning parameters passed to \code{\link{pcglassoFast}} for each \eqn{\lambda}.}
 
 \item{verbose}{(integer, 0--5) Logging detail. 0 = silent; 1 = termination reason;
 2 = objective; 3--4 = tolerance adaptation; 5 = detailed R-step diagnostics.}
+
+\item{tol_QP}{(finite double > 0) Projected KKT tolerance for each box-constrained
+quadratic subproblem of \code{solver_R = "primal_dual"}. Default: \code{1e-10}.
+Passed unchanged to \code{\link{pcglassoFast}} at every \eqn{\lambda}, independently
+of \code{tol_R} and \code{tolerance}. Unused by the other solvers.}
 }
 \value{
 List with elements:
@@ -83,6 +89,12 @@ List with elements:
   \item \code{objective}: Numeric vector of final objective values at each \eqn{\lambda}.
   \item \code{iters}: Numeric vector of iterations needed for convergence per \eqn{\lambda}.
   \item \code{path_optimization_time}: Total runtime of the entire path computation.
+  \item \code{qp_diagnostics}: For \code{primal_dual}, a named list in the same
+    order as \code{lambdas}, with the same names as \code{R_path}. Each entry is
+    the \code{qp_diagnostics} returned by \code{\link{pcglassoFast}} for that
+    \eqn{\lambda}; counts are not accumulated across the path. Includes only
+    computed points if the path stops early. \code{all_converged} concerns the
+    inner QPs, not convergence of the full fit. \code{NULL} for other solvers.
 }
 }
 \description{
@@ -133,6 +145,11 @@ S <- cov(Z)
 
 # Fit PCGLASSO
 result <- pcglassoPath(S, alpha = 0, verbose = 1, nlambda = 6)
+
+# Use the primal-dual solver and inspect QP diagnostics at the first lambda
+result_pd <- pcglassoPath(S, alpha = 0, nlambda = 6,
+                         solver_R = "primal_dual", tol_QP = 1e-10)
+result_pd$qp_diagnostics[[1]]
 }
 \seealso{
 \code{\link{pcglassoFast}} for a single-lambda optimization.

@@ -30,11 +30,15 @@
 #' @param tolerance (double > 0) Outer loop convergence threshold per \eqn{\lambda}; stops when
 #'   objective improvement in a single iteration < tolerance.
 #' @param solver_R (character) Optimization method for R-step: \code{"dual"} (Fortran,
-#'   default) or \code{"primal"} (C++, alternative).
+#'   default), \code{"primal"} (C++), or \code{"primal_dual"} (C++).
 #' @param tol_R,max_iter_R,max_iter_R_outer,tol_D,max_iter_D_newton,max_iter_D_ls,diagonal_Newton
 #'   Tuning parameters passed to \code{\link{pcglassoFast}} for each \eqn{\lambda}.
 #' @param verbose (integer, 0--5) Logging detail. 0 = silent; 1 = termination reason;
 #'   2 = objective; 3--4 = tolerance adaptation; 5 = detailed R-step diagnostics.
+#' @param tol_QP (finite double > 0) Projected KKT tolerance for each box-constrained
+#'   quadratic subproblem of \code{solver_R = "primal_dual"}. Default: \code{1e-10}.
+#'   Passed unchanged to \code{\link{pcglassoFast}} at every \eqn{\lambda}, independently
+#'   of \code{tol_R} and \code{tolerance}. Unused by the other solvers.
 #'
 #' @details
 #' \strong{Objective Function:}
@@ -76,6 +80,12 @@
 #'   \item \code{objective}: Numeric vector of final objective values at each \eqn{\lambda}.
 #'   \item \code{iters}: Numeric vector of iterations needed for convergence per \eqn{\lambda}.
 #'   \item \code{path_optimization_time}: Total runtime of the entire path computation.
+#'   \item \code{qp_diagnostics}: For \code{primal_dual}, a named list in the same
+#'     order as \code{lambdas}, with the same names as \code{R_path}. Each entry is
+#'     the \code{qp_diagnostics} returned by \code{\link{pcglassoFast}} for that
+#'     \eqn{\lambda}; counts are not accumulated across the path. Includes only
+#'     computed points if the path stops early. \code{all_converged} concerns the
+#'     inner QPs, not convergence of the full fit. \code{NULL} for other solvers.
 #' }
 #'
 #' @seealso
@@ -101,6 +111,11 @@
 #'
 #' # Fit PCGLASSO
 #' result <- pcglassoPath(S, alpha = 0, verbose = 1, nlambda = 6)
+#'
+#' # Use the primal-dual solver and inspect QP diagnostics at the first lambda
+#' result_pd <- pcglassoPath(S, alpha = 0, nlambda = 6,
+#'                          solver_R = "primal_dual", tol_QP = 1e-10)
+#' result_pd$qp_diagnostics[[1]]
 pcglassoPath <- function(
     S,
     alpha,
@@ -115,7 +130,7 @@ pcglassoPath <- function(
     # controls passed to pcglassoFast
     max_iter = 1000,
     tolerance = 1e-3,
-    solver_R = c("dual", "primal"),
+    solver_R = c("dual", "primal", "primal_dual"),
     tol_R = 1e-8,
     max_iter_R = 100,
     max_iter_R_outer = 500000,
@@ -123,9 +138,14 @@ pcglassoPath <- function(
     max_iter_D_newton = 5000,
     max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
-    verbose = 0) {
+    verbose = 0,
+    tol_QP = 1e-10) {
   solver_R <- tolower(solver_R)
   solver_R <- match.arg(solver_R)
+  if (!is.numeric(tol_QP) || length(tol_QP) != 1L ||
+      !is.finite(tol_QP) || tol_QP <= 0) {
+    stop("tol_QP must be a finite, positive number.", call. = FALSE)
+  }
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
@@ -176,6 +196,7 @@ pcglassoPath <- function(
   # prepare storage
   K <- length(lambdas)
   outW <- outWi <- outD <- outR <- outRi <- vector("list", K)
+  out_qp_diagnostics <- if (solver_R == "primal_dual") vector("list", K) else NULL
   objective_values <- iters <- numeric(K)
 
   # warm start
@@ -207,7 +228,8 @@ pcglassoPath <- function(
       max_iter_D_newton = max_iter_D_newton,
       max_iter_D_ls = max_iter_D_ls,
       diagonal_Newton = diagonal_Newton,
-      verbose = verbose
+      verbose = verbose,
+      tol_QP = tol_QP
     )
 
     # extract
@@ -223,6 +245,9 @@ pcglassoPath <- function(
     outWi[[k]] <- Rinv_curr * ((1/D_curr) %o% (1/D_curr))
     iters[k] <- fit$n_iters
     objective_values[k] <- utils::tail(fit$objective, 1)
+    if (!is.null(out_qp_diagnostics)) {
+      out_qp_diagnostics[k] <- list(fit$qp_diagnostics)
+    }
     # compute edge fraction and early stop
     edge_frac <- (sum(R_curr != 0) - p) / (p * (p - 1))
     if (edge_frac > max_edge_fraction) {
@@ -246,8 +271,14 @@ pcglassoPath <- function(
   outWi <- outWi[used]
   objective_values <- objective_values[used]
   iters <- iters[used]
+  if (!is.null(out_qp_diagnostics)) {
+    out_qp_diagnostics <- out_qp_diagnostics[used]
+  }
 
   names(outR) <- names(outD) <- names(outW) <- paste0("lam_", round(lambdas, 4))
+  if (!is.null(out_qp_diagnostics)) {
+    names(out_qp_diagnostics) <- names(outR)
+  }
   list(
     lambdas = lambdas,
     R_path = outR,
@@ -257,7 +288,8 @@ pcglassoPath <- function(
     Wi_path = outWi,
     objective = objective_values,
     iters = iters,
-    path_optimization_time = path_time_full
+    path_optimization_time = path_time_full,
+    qp_diagnostics = out_qp_diagnostics
   )
 }
 
