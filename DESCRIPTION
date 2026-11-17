@@ -22,8 +22,7 @@ Imports:
     stats,
     utils
 Suggests: 
-    MASS,
-    PCGLASSO
+    MASS
 LinkingTo: 
     Rcpp,
     RcppArmadillo

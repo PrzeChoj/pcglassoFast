@@ -46,6 +46,8 @@ Any bugs encountered when using the package can be reported [here](https://githu
 ## **Notes**
 Part of the code (`ROptimDual()` and the Fortran code) was adapted from the `glassoFast` package: <https://github.com/JClavel/glassoFast>.
 
+For another implementation of the PCGLASSO estimator, see Jack Storror Carter's [PCGLASSO package](https://github.com/JackStorrorCarter/PCGLASSO).
+
 ## Citation
 
 If you use `pcglassoFast`, please cite both the package and the paper describing the method and algorithms:
