@@ -13,6 +13,19 @@ struct BoxQpStatus {
   bool converged;
 };
 
+struct BoxQpTotals {
+  double calls = 0;
+  double iterations = 0;
+  double limit_hits = 0;
+  double unconverged = 0;
+};
+
+void check_qp_control(const int max_iter, const double tol) {
+  if (max_iter < 1 || !std::isfinite(tol) || tol <= 0.0) {
+    Rcpp::stop("Iteration limits must be positive and tolerances finite and positive.");
+  }
+}
+
 double projected_kkt_residual(
     const arma::mat& Q,
     const arma::vec& u,
@@ -133,7 +146,8 @@ void primal_dual_sweep_inplace(
     arma::mat& U,
     const double lambda,
     const int qpMaxIter,
-    const double qpTol) {
+    const double qpTol,
+    BoxQpTotals& totals) {
   const arma::uword p = R.n_rows;
   arma::vec u(p);
   arma::vec grad;
@@ -141,9 +155,15 @@ void primal_dual_sweep_inplace(
 
   for (arma::uword j = 0; j < p; ++j) {
     u = U.col(j);
-    box_qp_full_without_column(
+    const BoxQpStatus status = box_qp_full_without_column(
       R, S.col(j), u, j, lambda, qpMaxIter, qpTol, grad, z
     );
+    totals.calls += 1;
+    totals.iterations += status.iterations;
+    // Reaching the last permitted iteration does not imply non-convergence:
+    // the criterion can be satisfied on that same iteration.
+    totals.limit_hits += status.iterations == qpMaxIter;
+    totals.unconverged += !status.converged;
 
     const double tval = arma::dot(z, 0.5 * grad);
     const double disc = 1.0 + 4.0 * tval;
@@ -207,6 +227,7 @@ Rcpp::List boxQpCpp(
     double rho,
     int maxIter,
     double tol) {
+  check_qp_control(maxIter, tol);
   arma::vec grad;
   const BoxQpStatus status = box_qp_dense(
     Q, u, b, rho, maxIter, tol, grad
@@ -217,7 +238,9 @@ Rcpp::List boxQpCpp(
     Rcpp::Named("u") = u,
     Rcpp::Named("kkt.residual") = status.kkt_residual,
     Rcpp::Named("iterations") = status.iterations,
-    Rcpp::Named("converged") = status.converged
+    Rcpp::Named("converged") = status.converged,
+    Rcpp::Named("iteration_limit") = status.iterations == maxIter,
+    Rcpp::Named("stop_reason") = status.converged ? "converged" : "iteration_limit"
   );
 }
 
@@ -229,11 +252,17 @@ Rcpp::List primalDualSweepCpp(
     double lambda,
     int qpMaxIter,
     double qpTol) {
-  primal_dual_sweep_inplace(S, R, U, lambda, qpMaxIter, qpTol);
+  check_qp_control(qpMaxIter, qpTol);
+  BoxQpTotals totals;
+  primal_dual_sweep_inplace(S, R, U, lambda, qpMaxIter, qpTol, totals);
 
   return Rcpp::List::create(
     Rcpp::Named("R") = R,
-    Rcpp::Named("U") = U
+    Rcpp::Named("U") = U,
+    Rcpp::Named("qp_calls") = totals.calls,
+    Rcpp::Named("qp_iterations") = totals.iterations,
+    Rcpp::Named("qp_cap_count") = totals.limit_hits,
+    Rcpp::Named("qp_unconverged_count") = totals.unconverged
   );
 }
 
@@ -247,15 +276,18 @@ Rcpp::List primalDualOuterCpp(
     double outerTol,
     int qpMaxIter,
     double qpTol) {
+  check_qp_control(outerMaxIter, outerTol);
+  check_qp_control(qpMaxIter, qpTol);
   arma::vec rel_err(outerMaxIter);
   arma::vec rms_err(outerMaxIter);
   arma::vec sparse_nos(outerMaxIter);
   arma::mat R_old(R.n_rows, R.n_cols);
   int outer_count = outerMaxIter;
+  BoxQpTotals totals;
 
   for (int outer = 0; outer < outerMaxIter; ++outer) {
     R_old = R;
-    primal_dual_sweep_inplace(S, R, U, lambda, qpMaxIter, qpTol);
+    primal_dual_sweep_inplace(S, R, U, lambda, qpMaxIter, qpTol, totals);
 
     double max_change = 0.0;
     double rms_change = 0.0;
@@ -278,6 +310,10 @@ Rcpp::List primalDualOuterCpp(
     Rcpp::Named("outer.count") = outer_count,
     Rcpp::Named("rel.err") = rel_err.subvec(0, outer_count - 1),
     Rcpp::Named("rms.err") = rms_err.subvec(0, outer_count - 1),
-    Rcpp::Named("sparse.nos") = sparse_nos.subvec(0, outer_count - 1)
+    Rcpp::Named("sparse.nos") = sparse_nos.subvec(0, outer_count - 1),
+    Rcpp::Named("qp_calls") = totals.calls,
+    Rcpp::Named("qp_iterations") = totals.iterations,
+    Rcpp::Named("qp_cap_count") = totals.limit_hits,
+    Rcpp::Named("qp_unconverged_count") = totals.unconverged
   );
 }

@@ -11,10 +11,28 @@
 
 ROptimPrimalDual <-
   function(S, R = NULL, U = NULL, lambda, outer.Maxiter = 100, outer.tol = 10^-5,
-           qp.Maxiter = 1000, qp.tol = 2*.Machine$double.eps, obj.seq = FALSE,
+           qp.Maxiter = 1000, qp.tol = 1e-10, obj.seq = FALSE,
            stopping.rule = c("hybrid", "max"),
            track.qp.time = FALSE) {
     stopping.rule <- match.arg(stopping.rule)
+    valid_iterations <- function(x) {
+      is.numeric(x) && length(x) == 1L && is.finite(x) &&
+        x >= 1 && x <= .Machine$integer.max && x == floor(x)
+    }
+    if (!valid_iterations(qp.Maxiter) || !valid_iterations(outer.Maxiter)) {
+      stop("qp.Maxiter and outer.Maxiter should be positive integers.", call. = FALSE)
+    }
+    valid_tolerance <- function(x) {
+      is.numeric(x) && length(x) == 1L && is.finite(x) && x > 0
+    }
+    if (!valid_tolerance(qp.tol) || !valid_tolerance(outer.tol)) {
+      stop("qp.tol and outer.tol should be finite, positive numbers.", call. = FALSE)
+    }
+    qp_diagnostics <- list(calls = 0, iterations = 0, limit_hits = 0, unconverged = 0)
+    native_diagnostics <- function(result) {
+      list(calls = result$qp_calls, iterations = result$qp_iterations,
+           limit_hits = result$qp_cap_count, unconverged = result$qp_unconverged_count)
+    }
     if (is.null(S)) stop("S is required as input.", call. = FALSE)
     if (!is.matrix(S)) S <- as.matrix(S)
     if (!is.numeric(S)) stop("S should be numeric.", call. = FALSE)
@@ -63,7 +81,9 @@ ROptimPrimalDual <-
       obj.vals <- if (obj.seq) .dp_pcg_objective(R, S, lambda) else NULL
       result <- list(
         R = R, U = U, rel.err = 0, rms.err = 0, sparse.nos = 0,
-        time.counter.QP = c(user = 0, system = 0, elapsed = 0)
+        R_symetric = R, Rinv = NULL, dual_box = U, outer.count = 0L,
+        time.counter.QP = c(user = 0, system = 0, elapsed = 0),
+        qp_diagnostics = qp_diagnostics
       )
       if (obj.seq) result$obj.vals <- obj.vals
       return(result)
@@ -100,7 +120,8 @@ ROptimPrimalDual <-
         time.counter.QP = c(user = 0, system = 0, elapsed = 0),
         rel.err = opt$rel.err,
         rms.err = opt$rms.err,
-        sparse.nos = opt$sparse.nos
+        sparse.nos = opt$sparse.nos,
+        qp_diagnostics = native_diagnostics(opt)
       ))
     }
 
@@ -129,6 +150,7 @@ ROptimPrimalDual <-
       }
       R <- sweep$R
       U <- sweep$U
+      qp_diagnostics <- Map(`+`, qp_diagnostics, native_diagnostics(sweep))
 
       diag(R) <- 1
       diff_R <- R - R.old
@@ -175,7 +197,8 @@ ROptimPrimalDual <-
       time.counter.QP = time.counter.QP,
       rel.err = max.err,
       rms.err = rms.err,
-      sparse.nos = sparse.nos
+      sparse.nos = sparse.nos,
+      qp_diagnostics = qp_diagnostics
     )
     if (obj.seq) result$obj.vals <- obj.vals[seq_len(outer.iter)]
 

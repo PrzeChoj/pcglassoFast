@@ -16,8 +16,12 @@
 #' @param tolerance (double > 0) Outer loop convergence threshold; stops when
 #'   objective improvement in a single iteration < tolerance.
 #' @param solver_R (character) Optimization method for R-step: \code{"dual"} (Fortran,
-#'   default) or \code{"primal"} (C++, alternative).
+#'   default), \code{"primal"} (C++), or \code{"primal_dual"} (C++).
 #' @param tol_R (double > 0) Inner convergence tolerance for R-step optimization.
+#' @param tol_QP (finite double > 0) Projected KKT tolerance for each box-constrained
+#'   quadratic subproblem of \code{solver_R = "primal_dual"}. Default: \code{1e-10}.
+#'   This controls the inner QP, independently of \code{tol_R} (R sweeps) and
+#'   \code{tolerance} (the full fit). It is unused by the other solvers.
 #' @param max_iter_R (integer) Baseline maximum iterations for the inner
 #'   R-step solver. For the dual solver, the effective per-column cap is
 #'   increased with the matrix dimension and current outer-iteration budget.
@@ -57,6 +61,14 @@
 #'   \item \code{n_iters}: Number of outer loop iterations.
 #'   \item \code{objective}: Objective value history.
 #'   \item \code{optimization_time}: Runtime of the optimization.
+#'   \item \code{qp_diagnostics}: For \code{primal_dual}, cumulative QP diagnostics
+#'     across all attempted R steps, including rejected proposals: \code{calls},
+#'     \code{iterations}, \code{limit_hits}, \code{unconverged}, \code{tolerance},
+#'     and \code{all_converged}. A limit hit also counts a QP that meets its
+#'     criterion on its last allowed iteration; \code{unconverged} counts only
+#'     QPs that did not meet the criterion. \code{all_converged} describes these
+#'     inner solves, not convergence or global optimality of the full fit.
+#'     \code{NULL} for the other solvers.
 #' }
 #'
 #' @seealso \code{\link{pcglassoPath}} for regularization path computation.
@@ -88,9 +100,14 @@ pcglassoFast <- function(
     tol_D = 1e-8,
     max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
-    verbose = 0) {
+    verbose = 0,
+    tol_QP = 1e-10) {
   solver_R <- tolower(solver_R)
   solver_R <- match.arg(solver_R)
+  if (!is.numeric(tol_QP) || length(tol_QP) != 1L ||
+      !is.finite(tol_QP) || tol_QP <= 0) {
+    stop("tol_QP must be a finite, positive number.", call. = FALSE)
+  }
   stopifnot(
     is.matrix(S),
     nrow(S) == ncol(S),
@@ -149,6 +166,9 @@ pcglassoFast <- function(
   R <- R0
   R_inv <- R0_inv
   R_dual_box <- NULL
+  qp_diagnostics <- if (solver_R == "primal_dual") {
+    list(calls = 0, iterations = 0, limit_hits = 0, unconverged = 0)
+  } else NULL
   C <- cov2cor(S)
   strating_time <- Sys.time()
   digits_to_print <- max(0, -floor(log10(tolerance)))
@@ -218,7 +238,8 @@ pcglassoFast <- function(
         tol_R, tol_R_curr, max_iter_R, max_iter_R_outer,
         objective_history[length(objective_history)], verbose,
         length(objective_history) / 2,
-        R_dual_box_curr = R_dual_box
+        R_dual_box_curr = R_dual_box,
+        tol_QP = tol_QP
       )
     } else {
       R_result <- R_step(
@@ -229,6 +250,11 @@ pcglassoFast <- function(
       )
     }
 
+    if (solver_R == "primal_dual" && !is.null(R_result$qp_diagnostics)) {
+      for (name in names(qp_diagnostics)) {
+        qp_diagnostics[[name]] <- qp_diagnostics[[name]] + R_result$qp_diagnostics[[name]]
+      }
+    }
     R_optimizaiton_improved_objective <-
       R_result$proposed_objective -
         objective_history[length(objective_history)] > -2 * tolerance
@@ -290,6 +316,15 @@ pcglassoFast <- function(
   if (is.null(R_inv)) {
     R_inv <- solve(R)
   }
+  if (!is.null(qp_diagnostics)) {
+    qp_diagnostics$tolerance <- tol_QP
+    qp_diagnostics$all_converged <- qp_diagnostics$unconverged == 0
+    if (verbose >= 1 && !qp_diagnostics$all_converged) {
+      message(qp_diagnostics$unconverged, " of ", qp_diagnostics$calls,
+              " QP solves reached their iteration limit without meeting tol_QP (",
+              tol_QP, "). See qp_diagnostics.")
+    }
+  }
   list(
     "Sinv" = R * (D %o% D),
     "S" = R_inv * ((1 / D) %o% (1 / D)),
@@ -298,7 +333,8 @@ pcglassoFast <- function(
     "R_inv" = R_inv,
     "n_iters" = floor(length(objective_history)/2),
     "objective" = objective_history,
-    "optimization_time" = optimization_time
+    "optimization_time" = optimization_time,
+    "qp_diagnostics" = qp_diagnostics
   )
 }
 
@@ -424,7 +460,7 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
 }
 
 
-R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number, R_dual_box_curr = NULL) {
+R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number, R_dual_box_curr = NULL, tol_QP = 1e-10) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
   p <- dim(C)[1]
 
@@ -432,6 +468,7 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
   max_iter_R_outer_curr <- 100
 
   iterations_in_dual_done <- 0
+  qp_diagnostics <- list(calls = 0, iterations = 0, limit_hits = 0, unconverged = 0)
 
   repeat {
     if (verbose >= 5) {
@@ -448,11 +485,14 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
       outer.Maxiter = max_iter_R_outer_curr,
       outer.tol = tol_R_curr,
       qp.Maxiter = max_iter_R,
-      qp.tol = 2*.Machine$double.eps,
+      qp.tol = tol_QP,
       obj.seq = FALSE,
       stopping.rule = "max",
       track.qp.time = FALSE
     )
+    for (name in names(qp_diagnostics)) {
+      qp_diagnostics[[name]] <- qp_diagnostics[[name]] + resR$qp_diagnostics[[name]]
+    }
 
     if ((!is.null(resR$Rinv) && any(is.nan(resR$Rinv))) | any(is.nan(resR$R_symetric))) {
       warn("NaNs introduced in primal-dual calculations")
@@ -547,7 +587,8 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
     R_inv = resR$Rinv,
     dual_box = resR$dual_box,
     proposed_objective = proposed_objective,
-    iterations_done = iterations_in_dual_done
+    iterations_done = iterations_in_dual_done,
+    qp_diagnostics = qp_diagnostics
   )
 }
 
