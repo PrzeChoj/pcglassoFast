@@ -17,10 +17,9 @@
 #'
 #' @param K True precision matrix (p x p, symmetric, positive definite).
 #'
-#' @returns A non-negative scalar:
-#'   \item{}{< 1: Irrepresentability condition holds. Recovery guarantees apply (asymptotically).}
-#'   \item{}{>= 1: Irrepresentability condition violated. No recovery guarantees (but methods may
-#'     still work in practice).}
+#' @returns A non-negative scalar measuring the irrepresentability condition.
+#'   Values below 1 indicate that the condition holds; values of 1 or greater
+#'   indicate that it does not.
 #'
 #' @details
 #' \strong{PCGLASSO vs. GLASSO comparison:}

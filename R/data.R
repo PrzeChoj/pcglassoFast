@@ -1,6 +1,6 @@
 #' Precision matrix from a real‐data PC‐GLASSO path
 #'
-#' This dataset contains a single \(124 \times 124\) precision matrix \(Q\)
+#' This dataset contains a single \eqn{124 \times 124} precision matrix \eqn{Q}
 #' obtained along the solution path of the PC‐GLASSO algorithm applied
 #' to a real‐world data set.  This matrix reflects the estimated conditional
 #' dependencies among variables at a particular regularization level.
@@ -27,9 +27,9 @@
 
 #' Precision matrix from a simulated GLASSO path
 #'
-#' This dataset contains a single \(124\times 124\) precision matrix \(Q\)
+#' This dataset contains a single \eqn{124 \times 124} precision matrix \eqn{Q}
 #' estimated by the graphical lasso (GLASSO) on simulated multivariate data.
-#' It illustrates the effect of \(\ell_1\) penalization on the precision
+#' It illustrates the effect of \eqn{\ell_1} penalization on the precision
 #' matrix recovery in a controlled setting.
 #'
 #' @format A numeric matrix with \code{124} rows and \code{p} columns.

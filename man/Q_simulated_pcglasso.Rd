@@ -14,7 +14,7 @@ A numeric matrix with \code{124} rows and \code{124} columns.
 Q_simulated_pcglasso
 }
 \description{
-This dataset contains a single \(124 \times 124\) precision matrix \(Q\)
+This dataset contains a single \eqn{124 \times 124} precision matrix \eqn{Q}
 obtained along the solution path of the PC‐GLASSO algorithm applied
 to a real‐world data set.  This matrix reflects the estimated conditional
 dependencies among variables at a particular regularization level.

@@ -13,9 +13,9 @@ A numeric matrix with \code{124} rows and \code{p} columns.
 Q_simulated_glasso
 }
 \description{
-This dataset contains a single \(124\times 124\) precision matrix \(Q\)
+This dataset contains a single \eqn{124 \times 124} precision matrix \eqn{Q}
 estimated by the graphical lasso (GLASSO) on simulated multivariate data.
-It illustrates the effect of \(\ell_1\) penalization on the precision
+It illustrates the effect of \eqn{\ell_1} penalization on the precision
 matrix recovery in a controlled setting.
 }
 \examples{
