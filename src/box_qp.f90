@@ -3,9 +3,9 @@
       integer :: qq, MAXIT, outer, j
 !     double precision Q(qq,qq), u(qq), b(qq), grad(qq)
 !     double precision tol, tt, bb, uold, rho, objcur, del, objold, dlx 
-      real(kind=8), dimension (qq,qq) :: Q
-      real(kind=8), dimension (qq) :: u, b, grad
-      real(kind=8) :: tol, tt, bb, uold, rho, objcur, del, objold, dlx 
+      double precision, dimension (qq,qq) :: Q
+      double precision, dimension (qq) :: u, b, grad
+      double precision :: tol, tt, bb, uold, rho, objcur, del, objold, dlx
       grad = MATMUL(Q,u+b)
       grad=2.0*grad
 !      write(*,*) grad(1:2)
