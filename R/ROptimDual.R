@@ -6,6 +6,7 @@
 #' @param lambda Non-negative off-diagonal penalty.
 #' @param tol Convergence tolerance for the outer matrix sweeps.
 #' @param max_outer_iter Maximum number of outer matrix sweeps.
+#' @param max_inner_iter Maximum number of LASSO passes per column in each sweep.
 #'
 #' @noRd
 ROptimDual <- function(
@@ -14,14 +15,22 @@ ROptimDual <- function(
     Rinv,
     lambda,
     tol = 1e-8,
-    max_outer_iter = 100) {
+    max_outer_iter = 100,
+    max_inner_iter = max_outer_iter * nrow(R)) {
   if (is.null(Rinv)) {
     Rinv <- solve(R)
   }
 
   p <- dim(R)[1]
-  stopifnot(p > 1)
-  max_inner_iter <- max_outer_iter * p
+  stopifnot(
+    p > 1,
+    length(max_outer_iter) == 1L, is.numeric(max_outer_iter),
+    max_outer_iter >= 1, max_outer_iter <= .Machine$integer.max,
+    max_outer_iter == floor(max_outer_iter),
+    length(max_inner_iter) == 1L, is.numeric(max_inner_iter),
+    max_inner_iter >= 1, max_inner_iter <= .Machine$integer.max,
+    max_inner_iter == floor(max_inner_iter)
+  )
   lambda_matrix <- matrix(lambda, p, p); diag(lambda_matrix) <- 0
   ans <- ROptim_to_fortran(
     S,

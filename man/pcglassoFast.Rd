@@ -49,9 +49,9 @@ default), \code{"primal"} (C++), or \code{"primal_dual"} (C++).}
 
 \item{tol_R}{(double > 0) Inner convergence tolerance for R-step optimization.}
 
-\item{max_iter_R}{(integer) Baseline maximum iterations for the inner
-R-step solver. For the dual solver, the effective per-column cap is
-increased with the matrix dimension and current outer-iteration budget.}
+\item{max_iter_R}{(integer) Maximum R sweeps for the primal solver or QP
+iterations for the primal-dual solver. The dual solver sets its per-column
+LASSO limit to the planned number of sweeps times the matrix dimension.}
 
 \item{max_iter_R_outer}{(integer) Maximum iterations for R-step dual solver.}
 

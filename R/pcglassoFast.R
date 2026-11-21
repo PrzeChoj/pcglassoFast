@@ -22,9 +22,9 @@
 #'   quadratic subproblem of \code{solver_R = "primal_dual"}. Default: \code{1e-10}.
 #'   This controls the inner QP, independently of \code{tol_R} (R sweeps) and
 #'   \code{tolerance} (the full fit). It is unused by the other solvers.
-#' @param max_iter_R (integer) Baseline maximum iterations for the inner
-#'   R-step solver. For the dual solver, the effective per-column cap is
-#'   increased with the matrix dimension and current outer-iteration budget.
+#' @param max_iter_R (integer) Maximum R sweeps for the primal solver or QP
+#'   iterations for the primal-dual solver. The dual solver sets its per-column
+#'   LASSO limit to the planned number of sweeps times the matrix dimension.
 #' @param max_iter_R_outer (integer) Maximum iterations for R-step dual solver.
 #' @param tol_D (double > 0) Inner convergence tolerance for D-step optimization.
 #' @param max_iter_D_newton (integer) Maximum Newton-Raphson steps in D optimization.
@@ -341,11 +341,12 @@ pcglassoFast <- function(
 R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_optimization, times_tol_R_decrease, tol_R, tol_R_curr, max_iter_R, max_iter_R_outer, prev_objective, verbose, iteration_number) {
   digits_to_print <- max(0, -floor(log10(tolerance_full_optimization)))
   p <- dim(C)[1]
-  max_iter_R_outer_curr <- 100
+  planned_sweeps <- 100
 
   S_for_dual <- C * (D %o% D)
   iterations_in_dual_done <- 0
   repeat {
+    remaining_sweeps <- max_iter_R_outer - iterations_in_dual_done
     if (verbose >= 5) {
       print("=== R step ===")
       print(paste0("tol_R_curr = ", tol_R_curr))
@@ -359,7 +360,8 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
       Rinv = R_inv_curr,
       lambda = lambda,
       tol = tol_R_curr,
-      max_outer_iter = max_iter_R_outer_curr
+      max_outer_iter = min(planned_sweeps, remaining_sweeps),
+      max_inner_iter = planned_sweeps * p
     )
 
     if (any(is.nan(resR$Rinv)) | any(is.nan(resR$R))) {
@@ -434,15 +436,11 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
     if ((verbose >= 1) & (new_tol_R_curr < tol_R_curr)){
       print(paste0("Decreasing internal tol_R_curr to ", new_tol_R_curr))
     }
-    if (new_tol_R_curr == tol_R_curr) {
-      new_max_iter_R_outer_curr <- min(
-        floor(max_iter_R_outer_curr * 1.5),
-        max_iter_R_outer - iterations_in_dual_done
-      )
-      if ((verbose >=4) & (new_max_iter_R_outer_curr > max_iter_R_outer_curr)) {
-        print(paste0("Increasing max_iter_R_outer_curr to ", new_max_iter_R_outer_curr))
+    if (new_tol_R_curr == tol_R_curr && planned_sweeps < max_iter_R_outer) {
+      planned_sweeps <- min(floor(planned_sweeps * 1.5), max_iter_R_outer)
+      if (verbose >= 4) {
+        print(paste0("Increasing planned R sweeps to ", planned_sweeps))
       }
-      max_iter_R_outer_curr <- new_max_iter_R_outer_curr
     }
     tol_R_curr <- new_tol_R_curr
 
@@ -471,6 +469,7 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
   qp_diagnostics <- list(calls = 0, iterations = 0, limit_hits = 0, unconverged = 0)
 
   repeat {
+    max_iter_R_outer_curr <- min(max_iter_R_outer_curr, max_iter_R_outer - iterations_in_dual_done)
     if (verbose >= 5) {
       print("=== R step (Primal-Dual) ===")
       print(paste0("tol_R_curr = ", tol_R_curr))
