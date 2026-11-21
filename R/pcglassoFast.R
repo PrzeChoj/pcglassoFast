@@ -186,6 +186,8 @@ pcglassoFast <- function(
   start_time <- Sys.time()
   if (multiple_thresholds) start_elapsed <- proc.time()[["elapsed"]]
   full_time_D_optim <- 0
+  D_iterations <- integer(0)
+  R_iterations <- integer(0)
   digits_to_print <- max(0, -floor(log10(tolerance)))
 
   R_symetric <- (R + t(R))/2
@@ -301,6 +303,9 @@ pcglassoFast <- function(
     R_dual_box <- if (solver_R == "primal_dual") R_result$dual_box else NULL
     improvement_R <- R_result$proposed_objective - objective_history[length(objective_history)]
     objective_history <- c(objective_history, R_result$proposed_objective)
+    cycle <- length(D_iterations) + 1L
+    D_iterations[cycle] <- as.integer(D_result[["iterations_done"]])
+    R_iterations[cycle] <- as.integer(R_result[["iterations_done"]])
 
     # decrease tol_R_curr
     if ((improvement_R * 10 < improvement_D) | (improvement_D < tolerance)) {
@@ -350,13 +355,16 @@ pcglassoFast <- function(
   }
   if (!multiple_thresholds) {
     return(.pcglasso_fit_result(R, D, R_inv, S, objective_history, optimization_time,
-                                full_time_D_optim, qp_diagnostics, tol_QP))
+                                full_time_D_optim, qp_diagnostics, tol_QP,
+                                D_iterations, R_iterations))
   }
 
   fits <- lapply(checkpoints, function(state) {
+    cycles <- seq_len((state$history_length - 1L) %/% 2L)
     .pcglasso_fit_result(
       state$R, state$D, state$R_inv, S, objective_history[seq_len(state$history_length)],
-      state$optimization_time, state$full_time_D_optim, state$qp_diagnostics, tol_QP
+      state$optimization_time, state$full_time_D_optim, state$qp_diagnostics, tol_QP,
+      D_iterations[cycles], R_iterations[cycles]
     )
   })
   results <- fits[checkpoint_index]
@@ -371,7 +379,8 @@ pcglassoFast <- function(
 }
 
 .pcglasso_fit_result <- function(R, D, R_inv, S, objective_history, optimization_time,
-                                full_time_D_optim, qp_diagnostics, tol_QP) {
+                                full_time_D_optim, qp_diagnostics, tol_QP,
+                                D_iterations, R_iterations) {
   R <- (R + t(R))/2
   D <- as.vector(D)
   D <- D / sqrt(diag(S))
@@ -392,7 +401,9 @@ pcglassoFast <- function(
     "objective" = objective_history,
     "optimization_time" = optimization_time,
     "qp_diagnostics" = qp_diagnostics,
-    "full_time_D_optim" = full_time_D_optim
+    "full_time_D_optim" = full_time_D_optim,
+    "D_iterations" = D_iterations,
+    "R_iterations" = R_iterations
   )
 }
 
