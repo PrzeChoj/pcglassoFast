@@ -11,7 +11,7 @@ R_step_primal <- function(
   )
 
   proposed_objective <- function_to_optimize(resR$R_symetric, D, C, lambda, alpha)
-  iterations_done <- length(resR$loglik)
+  iterations_done <- length(resR$loglik) - 1L # The history includes the starting value
 
   if (verbose >= 2) {
     print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_done, " iters of R optim"))
@@ -79,11 +79,11 @@ ROptimPrimal <- function(
   while (crit.outer) {
     # loop over vector
     loglik <- updateLoopCpp(S, Q, Qinv, loglik, lambda, tol.inner, max.inner.iter)
+    outer.count <- outer.count + 1
 
     err.outer <- loglik - loglik_old
     crit.outer <- ((err.outer > tol.outer) & (outer.count < max.outer.iter))
 
-    outer.count <- outer.count + 1
     loglik_vec[outer.count+1] <- loglik
     loglik_old <- loglik
   }

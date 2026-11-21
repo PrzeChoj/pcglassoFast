@@ -89,6 +89,7 @@ if (shr .eq. 0.0) then
    do i = 1,n
       X(i,i) = 1.0
    enddo
+   maxIt = 0
    return
 endif
 shr = thr*shr/(n-1)
