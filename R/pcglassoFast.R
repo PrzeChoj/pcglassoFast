@@ -512,7 +512,8 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
     }
 
     # Check if objective improved
-    objective_is_better <- (proposed_objective > prev_objective - tolerance_full_optimization * 0.1)
+    objective_change <- proposed_objective - prev_objective
+    objective_is_better <- objective_change > -0.1 * tolerance_full_optimization
 
     # Check if R is positive definite
     smallest_eigen_value <- eigen(resR$R_symetric, TRUE, TRUE)$values[p]
@@ -521,7 +522,7 @@ R_step_primalDual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance
     if (objective_is_better & R_positive_definite) {
       # Success: objective improved and R is valid
       if (verbose >= 2) {
-        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_in_dual_done, " iters of R optim"))
+        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(objective_change, digits_to_print), ", after ", iterations_in_dual_done, " iters of R optim"))
       }
       break  # ← EXIT repeat loop
     }
