@@ -32,7 +32,7 @@ void updateBeta(arma::vec& beta, const arma::mat& Qinv_ii, arma::vec& Qinv_beta,
     }else{
       xi =  -b / (1 - c) - s(j);
     }
-    if(std::abs(xi) > lambda || c > 1) {
+    if(std::abs(xi) > lambda || c >= 1) {
       double lambda_s = sign(xi) * lambda;
       double s_l = s(j) + lambda_s;
       double a_tilde = -s_l * a;
