@@ -75,9 +75,10 @@ integer iter, innerIter
 double precision EPS
 parameter (EPS = 1.1e-16)
 info = 0
-shr = sum(abs(S))
-do i = 1,n
-   shr = shr - abs(S(i, i))
+! Sum off-diagonal entries directly to preserve small correlations.
+shr = 0.0d0
+do j = 1,n
+   shr = shr + sum(abs(S(1:j-1,j))) + sum(abs(S(j+1:n,j)))
 enddo
 if (shr .eq. 0.0) then
 !  S is diagonal.
