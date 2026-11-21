@@ -38,9 +38,15 @@ void updateBeta(arma::vec& beta, const arma::mat& Qinv_ii, arma::vec& Qinv_beta,
       double a_tilde = -s_l * a;
       double b_tilde = a - 2 * s_l * b;
       double c_tilde = s_l * (1 - c) + b;
-      double b_div_a = b_tilde / (2 * a_tilde);
+      double sqrt_discriminant = std::sqrt(b_tilde * b_tilde - 4 * a_tilde * c_tilde);
       double beta_old = beta(j);
-      beta(j) = -b_div_a + sign(a_tilde) * std::sqrt(b_div_a*b_div_a - c_tilde / a_tilde);
+      // Rationalize the selected root when subtraction would cancel.
+      // At s_l == 0 this form gives the linear solution -b / a.
+      if (b_tilde > 0) {
+        beta(j) = -2 * c_tilde / (b_tilde + sqrt_discriminant);
+      } else {
+        beta(j) = (sqrt_discriminant - b_tilde) / (2 * a_tilde);
+      }
       Qinv_beta += Qinv_ii.col(j) * (beta(j) - beta_old);
       updateBtQb_cpp(c, Qinv_beta(j), beta(j), a, false);
     } else {
