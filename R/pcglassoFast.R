@@ -385,14 +385,19 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
       max(abs(error_matrix))
     }
     dual_constraint_satisfied <- (dual_constraint_error <= lambda * 1.1) # 1.1 for approximate satisfaction
-    objective_is_better <- (proposed_objective > prev_objective - tolerance_full_optimization * 0.1)
+    objective_change <- proposed_objective - prev_objective
+    objective_is_better <- objective_change > -0.1 * tolerance_full_optimization
 
     if (R_positive_definite & dual_constraint_satisfied & objective_is_better) {
       # no improvement is needed, we've converged
       if (verbose >= 2) {
-        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - prev_objective, digits_to_print), ", after ", iterations_in_dual_done, " iters of R optim"))
+        print(paste0("Iteration ", iteration_number, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(objective_change, digits_to_print), ", after ", iterations_in_dual_done, " iters of R optim"))
       }
       break
+    }
+
+    if (resR$outer.count == 0L) {
+      stop("Dual R step failed its acceptance criteria after zero sweeps.", call. = FALSE)
     }
 
     if (verbose >= 4) {
