@@ -74,7 +74,7 @@ cov2cor_inv <- function(C, diagSigma) {
     return(D %*% Cmat %*% D)
   }
 
-  if (k == 1L) {
+  if (is.matrix(C)) {
     # 2D case
     Sigma <- makeSigma(C, vars_mat[, 1])
     dn <- rownames(C)
@@ -82,13 +82,9 @@ cov2cor_inv <- function(C, diagSigma) {
     return(Sigma)
   } else {
     # 3D case
-    out <- array(0, c(p, p, k))
-    dimnames_C <- dimnames(C)
+    out <- array(0, c(p, p, k), dimnames = dimnames(C))
     for (i in seq_len(k)) {
       out[, , i] <- makeSigma(C[, , i], vars_mat[, i])
-      if (!is.null(dimnames_C[[1]])) {
-        rownames(out[, , i]) <- colnames(out[, , i]) <- dimnames_C[[1]]
-      }
     }
     return(out)
   }
