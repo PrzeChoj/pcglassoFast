@@ -155,6 +155,10 @@ pcglassoPath <- function(
   solver_R <- tolower(solver_R)
   solver_R <- match.arg(solver_R)
   .validate_edge_tol(edge_tol)
+  if (!is.numeric(tolerance) || !is.null(dim(tolerance)) || length(tolerance) != 1L ||
+      !is.finite(tolerance) || tolerance <= 0) {
+    stop("tolerance must be a single finite, positive number for pcglassoPath().", call. = FALSE)
+  }
   if (!is.numeric(tol_QP) || length(tol_QP) != 1L ||
       !is.finite(tol_QP) || tol_QP <= 0) {
     stop("tol_QP must be a finite, positive number.", call. = FALSE)
@@ -183,7 +187,6 @@ pcglassoPath <- function(
     all(is.finite(D0)), all(D0 > 0),
     is.numeric(alpha), alpha < 1,
     is.numeric(nlambda), nlambda >= 1,
-    is.numeric(tolerance), tolerance > 0,
     max_iter >= 1,
     is.null(lambdas) || is.numeric(lambdas),
     min_lambda_ratio >= 0 && min_lambda_ratio <= 1,

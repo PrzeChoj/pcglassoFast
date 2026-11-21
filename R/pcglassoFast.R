@@ -104,6 +104,19 @@ pcglassoFast <- function(
     tol_QP = 1e-10) {
   solver_R <- tolower(solver_R)
   solver_R <- match.arg(solver_R)
+  if (!is.numeric(tolerance) || !is.null(dim(tolerance)) || !length(tolerance) ||
+      any(!is.finite(tolerance)) || any(tolerance <= 0) || any(diff(tolerance) >= 0)) {
+    stop("tolerance must contain finite positive numbers in strictly decreasing order.", call. = FALSE)
+  }
+  thresholds <- tolerance
+  multiple_thresholds <- length(thresholds) > 1L
+  tolerance <- thresholds[[length(thresholds)]]
+  if (multiple_thresholds) {
+    next_threshold <- 1L
+    checkpoints <- list()
+    checkpoint_index <- rep(NA_integer_, length(thresholds))
+    stop_reason <- "max_iter was reached"
+  }
   if (!is.numeric(tol_QP) || length(tol_QP) != 1L ||
       !is.finite(tol_QP) || tol_QP <= 0) {
     stop("tol_QP must be a finite, positive number.", call. = FALSE)
@@ -127,7 +140,7 @@ pcglassoFast <- function(
     !is.null(R0),
     is.numeric(lambda), lambda >= 0,
     is.numeric(alpha), alpha < 1,
-    max_iter >= 1, tolerance > 0,
+    max_iter >= 1,
     is.matrix(R0), is.matrix(R0_inv),
     length(diagonal_Newton) == 1, is.logical(diagonal_Newton), !is.na(diagonal_Newton),
     all(diag(R0) == 1),
@@ -170,7 +183,8 @@ pcglassoFast <- function(
     list(calls = 0, iterations = 0, limit_hits = 0, unconverged = 0)
   } else NULL
   C <- cov2cor(S)
-  strating_time <- Sys.time()
+  start_time <- Sys.time()
+  if (multiple_thresholds) start_elapsed <- proc.time()[["elapsed"]]
   full_time_D_optim <- 0
   digits_to_print <- max(0, -floor(log10(tolerance)))
 
@@ -223,6 +237,7 @@ pcglassoFast <- function(
     }
 
     if (proposed_objective <= objective_history[length(objective_history)] - (tol_D * 2)) {
+      stop_reason <- "the D step was rejected"
       break
     }
     D <- D_result$D
@@ -272,6 +287,7 @@ pcglassoFast <- function(
       )
     }
     if (!R_optimizaiton_improved_objective) {
+      stop_reason <- "the R step was rejected"
       stop_loop <- TRUE
       if (verbose >= 1) {
         message("Ending optimization as objective worsen after the R optimizaiton.")
@@ -296,7 +312,22 @@ pcglassoFast <- function(
     }
 
     # loop
-    stop_loop <- (objective_history[length(objective_history)] - objective_history[length(objective_history) - 2] < tolerance)
+    history_length <- length(objective_history)
+    cycle_improvement <- objective_history[history_length] - objective_history[history_length - 2L]
+    stop_loop <- cycle_improvement < tolerance
+    if (multiple_thresholds && cycle_improvement < thresholds[next_threshold]) {
+      elapsed <- proc.time()[["elapsed"]] - start_elapsed
+      index <- length(checkpoints) + 1L
+      checkpoints[[index]] <- list(
+        R = R, D = D, R_inv = R_inv, qp_diagnostics = qp_diagnostics,
+        history_length = history_length, full_time_D_optim = full_time_D_optim,
+        optimization_time = as.difftime(elapsed, units = "secs")
+      )
+      while (next_threshold <= length(thresholds) && cycle_improvement < thresholds[next_threshold]) {
+        checkpoint_index[next_threshold] <- index
+        next_threshold <- next_threshold + 1L
+      }
+    }
     if ((verbose >= 1) && stop_loop) {
       message(paste0("Ending optimization after ", floor(length(objective_history)/2), " iterations as objective improved less than a tolerance (", tolerance, ")"))
     }
@@ -306,13 +337,41 @@ pcglassoFast <- function(
     }
   }
 
-  ending_time <- Sys.time()
-  optimization_time <- ending_time - strating_time
+  optimization_time <- Sys.time() - start_time
 
   if (verbose >= 1) {
     print(paste0("Optimization took ", round(optimization_time, 3), " ", attr(optimization_time, "units")))
   }
 
+  if (!is.null(qp_diagnostics) && verbose >= 1 && qp_diagnostics$unconverged > 0) {
+    message(qp_diagnostics$unconverged, " of ", qp_diagnostics$calls,
+            " QP solves reached their iteration limit without meeting tol_QP (",
+            tol_QP, "). See qp_diagnostics.")
+  }
+  if (!multiple_thresholds) {
+    return(.pcglasso_fit_result(R, D, R_inv, S, objective_history, optimization_time,
+                                full_time_D_optim, qp_diagnostics, tol_QP))
+  }
+
+  fits <- lapply(checkpoints, function(state) {
+    .pcglasso_fit_result(
+      state$R, state$D, state$R_inv, S, objective_history[seq_len(state$history_length)],
+      state$optimization_time, state$full_time_D_optim, state$qp_diagnostics, tol_QP
+    )
+  })
+  results <- fits[checkpoint_index]
+  labels <- as.character(thresholds)
+  if (anyDuplicated(labels)) labels <- sprintf("%.17g", thresholds)
+  names(results) <- labels
+  if (anyNA(checkpoint_index)) {
+    warning("Tolerances not reached because ", stop_reason, ": ",
+            paste(labels[is.na(checkpoint_index)], collapse = ", "), call. = FALSE)
+  }
+  results
+}
+
+.pcglasso_fit_result <- function(R, D, R_inv, S, objective_history, optimization_time,
+                                full_time_D_optim, qp_diagnostics, tol_QP) {
   R <- (R + t(R))/2
   D <- as.vector(D)
   D <- D / sqrt(diag(S))
@@ -322,11 +381,6 @@ pcglassoFast <- function(
   if (!is.null(qp_diagnostics)) {
     qp_diagnostics$tolerance <- tol_QP
     qp_diagnostics$all_converged <- qp_diagnostics$unconverged == 0
-    if (verbose >= 1 && !qp_diagnostics$all_converged) {
-      message(qp_diagnostics$unconverged, " of ", qp_diagnostics$calls,
-              " QP solves reached their iteration limit without meeting tol_QP (",
-              tol_QP, "). See qp_diagnostics.")
-    }
   }
   list(
     "Sinv" = R * (D %o% D),
