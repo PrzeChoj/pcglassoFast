@@ -344,6 +344,9 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
   planned_sweeps <- 100
 
   S_for_dual <- C * (D %o% D)
+  # Allow for roundoff at the scale of S_for_dual, even when lambda is zero.
+  roundoff_margin <- 8 * .Machine$double.eps * max(1, abs(S_for_dual))
+  dual_constraint_limit <- 1.1 * lambda + roundoff_margin
   iterations_in_dual_done <- 0
   repeat {
     remaining_sweeps <- max_iter_R_outer - iterations_in_dual_done
@@ -384,7 +387,7 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
       diag(error_matrix) <- 0 # dual constraint involve only off-diagonal
       max(abs(error_matrix))
     }
-    dual_constraint_satisfied <- (dual_constraint_error <= lambda * 1.1) # 1.1 for approximate satisfaction
+    dual_constraint_satisfied <- dual_constraint_error <= dual_constraint_limit
     objective_change <- proposed_objective - prev_objective
     objective_is_better <- objective_change > -0.1 * tolerance_full_optimization
 
@@ -406,7 +409,7 @@ R_step_dual <- function(C, D, lambda, alpha, R_curr, R_inv_curr, tolerance_full_
         if (!R_positive_definite) {
           paste0("R matrix was not positive definite (eigen value ", round(smallest_eigen_value, digits_to_print), ")")
         } else if (!dual_constraint_satisfied) {
-          paste0("dual constraint was not satisfied (dual error ", round(dual_constraint_error, digits_to_print), " vs lambda = ", round(lambda, digits_to_print), ")")
+          paste0("dual constraint was not satisfied (dual error ", signif(dual_constraint_error, 4), " vs limit = ", signif(dual_constraint_limit, 4), ")")
         } else {
           paste0("objective has not yet improved (objective = ", round(proposed_objective, digits_to_print), " prev objective = ", round(prev_objective, digits_to_print), ")")
         }))
