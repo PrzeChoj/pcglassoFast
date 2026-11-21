@@ -171,6 +171,7 @@ pcglassoFast <- function(
   } else NULL
   C <- cov2cor(S)
   strating_time <- Sys.time()
+  full_time_D_optim <- 0
   digits_to_print <- max(0, -floor(log10(tolerance)))
 
   R_symetric <- (R + t(R))/2
@@ -191,6 +192,7 @@ pcglassoFast <- function(
       print("=== D step ===")
     }
     A <- C * R_symetric
+    D_start_time <- proc.time()[["elapsed"]]
     D_result <- DOptim(
       A = A,
       d0 = D,
@@ -199,6 +201,7 @@ pcglassoFast <- function(
       max_ls_steps = max_iter_D_ls,
       alpha = alpha, diagonal_Newton = diagonal_Newton
     )
+    full_time_D_optim <- full_time_D_optim + (proc.time()[["elapsed"]] - D_start_time)
     proposed_objective <- function_to_optimize(R_symetric, D_result$D, C, lambda, alpha)
     if (verbose >= 2) {
       print(paste0("Iteration ", (length(objective_history) + 1)/2, ". Objective: ", round(proposed_objective, digits_to_print), ". Objective diff: ", round(proposed_objective - objective_history[length(objective_history)], digits_to_print), ", after ", D_result$iter, " iters of D optim"))
@@ -334,7 +337,8 @@ pcglassoFast <- function(
     "n_iters" = floor(length(objective_history)/2),
     "objective" = objective_history,
     "optimization_time" = optimization_time,
-    "qp_diagnostics" = qp_diagnostics
+    "qp_diagnostics" = qp_diagnostics,
+    "full_time_D_optim" = full_time_D_optim
   )
 }
 
