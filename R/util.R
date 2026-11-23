@@ -268,5 +268,6 @@ compare_matrices <- function(Q, Q_est, edge_tol = 1e-8) {
   S_reg <- evecs %*% diag(evals_truncated) %*% t(evecs)
 
   S_inv <- solve(S_reg)
-  cov2cor(S_inv)
+  R0 <- cov2cor(S_inv)
+  (R0 + t(R0)) / 2
 }

@@ -36,16 +36,15 @@ pcglassoPath(
 Must be strictly less than 1. Can be negative; typical value: \code{4/n} (n = sample size).}
 
 \item{lambdas}{(numeric vector) Sequence of sparsity penalties to fit.
-If \code{NULL}, an exponentially spaced decreasing grid of length \code{nlambda} from
-\eqn{\lambda_{\max} = \max_{i \neq j} |S_{ij}|} down to
-\eqn{\lambda_{\min} = \text{min\_lambda\_ratio} \cdot \lambda_{\max}} is generated
-automatically.}
+If \code{NULL}, generate a decreasing grid of length \code{nlambda}
+as described below.}
 
 \item{nlambda}{(integer) Number of lambda values when \code{lambdas = NULL}.
 Default: 50.}
 
 \item{min_lambda_ratio}{(double in [0, 1]) Ratio \eqn{\lambda_{\min}/\lambda_{\max}}
-used to construct the exponential grid. Default: 0.01.}
+used to construct the exponential grid. Default: 0.01. Set to zero to
+use zero as the final sparsity penalty.}
 
 \item{max_edge_fraction}{(double in [0, 1]) Maximum allowed fraction of detected
 edges among the \eqn{p(p-1)/2} possible pairs, using \code{edge_tol}.
@@ -136,10 +135,14 @@ passed to \code{\link{evaluate_objective_path}}.
 
 \strong{Lambda Grid Generation:}
 
-When \code{lambdas = NULL}, the grid is constructed as:
-\eqn{\lambda_k = \exp\left(\log(\lambda_{\max}) + \frac{k-1}{n_\lambda - 1} (\log(\lambda_{\min}) - \log(\lambda_{\max}))\right)}
-
-This exponential spacing is more appropriate for graphical lasso-type problems than linear spacing.
+The largest candidate penalty \eqn{\lambda_{\max}} equals the largest absolute
+off-diagonal correlation in \code{cov2cor(S)} plus 0.001. For a positive
+\code{min_lambda_ratio}, values are log-spaced from \eqn{\lambda_{\max}} down to
+\eqn{\lambda_{\max} \cdot \text{min\_lambda\_ratio}}.
+For a zero ratio, the last of the \code{nlambda} points is zero. The
+preceding points are log-spaced down to \eqn{0.01 \lambda_{\max}}.
+With two points the grid is \eqn{(\lambda_{\max}, 0)}, and with one
+point it contains only zero.
 }
 \examples{
 # Simulate hub network: variable 1 connected to all others
