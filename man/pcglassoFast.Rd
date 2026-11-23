@@ -22,7 +22,8 @@ pcglassoFast(
   max_iter_D_ls = 100,
   diagonal_Newton = TRUE,
   verbose = 0,
-  tol_QP = 1e-10
+  tol_QP = 1e-10,
+  start_elapsed = proc.time()[["elapsed"]]
 )
 }
 \arguments{
@@ -71,6 +72,10 @@ approximation (FALSE) in D-step Newton method.}
 quadratic subproblem of \code{solver_R = "primal_dual"}. Default: \code{1e-10}.
 This controls the inner QP, independently of \code{tol_R} (R sweeps) and
 \code{tolerance} (the full fit). It is unused by the other solvers.}
+
+\item{start_elapsed}{A reading of \code{proc.time()[["elapsed"]]} from the same
+R process. Defaults to the time at function entry. To include setup time,
+save this value before preparing the starting matrices and pass it here.}
 }
 \value{
 List with elements:
@@ -82,7 +87,9 @@ List with elements:
   \item \code{R_inv}: Inverse of R.
   \item \code{n_iters}: Number of outer loop iterations.
   \item \code{objective}: Objective value history.
-  \item \code{optimization_time}: Runtime of the optimization.
+  \item \code{optimization_time}: Elapsed time (\code{difftime} in seconds)
+    from \code{start_elapsed} to the end of optimization for a scalar tolerance,
+    or to the first full cycle reaching the corresponding threshold for a vector.
   \item \code{qp_diagnostics}: For \code{primal_dual}, cumulative QP diagnostics
     across all attempted R steps, including rejected proposals: \code{calls},
     \code{iterations}, \code{limit_hits}, \code{unconverged}, \code{tolerance},

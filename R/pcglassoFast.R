@@ -33,6 +33,9 @@
 #'   approximation (FALSE) in D-step Newton method.
 #' @param verbose (integer, 0--5) Logging detail. 0 = silent; 1 = termination reason;
 #'   2 = objective; 3--4 = tolerance adaptation; 5 = detailed R-step diagnostics.
+#' @param start_elapsed A reading of \code{proc.time()[["elapsed"]]} from the same
+#'   R process. Defaults to the time at function entry. To include setup time,
+#'   save this value before preparing the starting matrices and pass it here.
 #'
 #' @details
 #' \strong{Objective Function:}
@@ -60,7 +63,9 @@
 #'   \item \code{R_inv}: Inverse of R.
 #'   \item \code{n_iters}: Number of outer loop iterations.
 #'   \item \code{objective}: Objective value history.
-#'   \item \code{optimization_time}: Runtime of the optimization.
+#'   \item \code{optimization_time}: Elapsed time (\code{difftime} in seconds)
+#'     from \code{start_elapsed} to the end of optimization for a scalar tolerance,
+#'     or to the first full cycle reaching the corresponding threshold for a vector.
 #'   \item \code{qp_diagnostics}: For \code{primal_dual}, cumulative QP diagnostics
 #'     across all attempted R steps, including rejected proposals: \code{calls},
 #'     \code{iterations}, \code{limit_hits}, \code{unconverged}, \code{tolerance},
@@ -101,7 +106,14 @@ pcglassoFast <- function(
     max_iter_D_newton = 5000, max_iter_D_ls = 100,
     diagonal_Newton = TRUE,
     verbose = 0,
-    tol_QP = 1e-10) {
+    tol_QP = 1e-10,
+    start_elapsed = proc.time()[["elapsed"]]) {
+  force(start_elapsed)
+  if (!is.numeric(start_elapsed) || length(start_elapsed) != 1L ||
+      !is.null(dim(start_elapsed)) || !is.finite(start_elapsed) ||
+      start_elapsed > proc.time()[["elapsed"]]) {
+    stop("start_elapsed must be a finite elapsed-time reading at or before function entry.", call. = FALSE)
+  }
   solver_R <- tolower(solver_R)
   solver_R <- match.arg(solver_R)
   if (!is.numeric(tolerance) || !is.null(dim(tolerance)) || !length(tolerance) ||
@@ -183,8 +195,6 @@ pcglassoFast <- function(
     list(calls = 0, iterations = 0, limit_hits = 0, unconverged = 0)
   } else NULL
   C <- cov2cor(S)
-  start_time <- Sys.time()
-  if (multiple_thresholds) start_elapsed <- proc.time()[["elapsed"]]
   full_time_D_optim <- 0
   D_iterations <- integer(0)
   R_iterations <- integer(0)
@@ -342,7 +352,7 @@ pcglassoFast <- function(
     }
   }
 
-  optimization_time <- Sys.time() - start_time
+  optimization_time <- as.difftime(proc.time()[["elapsed"]] - start_elapsed, units = "secs")
 
   if (verbose >= 1) {
     print(paste0("Optimization took ", round(optimization_time, 3), " ", attr(optimization_time, "units")))
